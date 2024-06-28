@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package legend.tsslib.crypto.logroof;
+
+option go_package = "crypto/logproof";
+
+message LogStarMessage {
+    bytes salt = 1;
+    bytes S = 2;
+    bytes A = 3;
+    bytes Yx = 4;
+    bytes Yy = 5;
+    bytes D = 6;
+    string z1 = 7;
+    bytes z2 = 8;
+    string z3 = 9;
+}

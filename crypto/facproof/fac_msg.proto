@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package legend.tsslib.crypto.facproof;
+
+option go_package = "crypto/facproof";
+
+message NoSmallFactorMessage {
+    bytes salt = 1;
+    bytes P = 2;
+    bytes Q = 3;
+    bytes A = 4;
+    bytes B = 5;
+    bytes T = 6;
+    string sigma = 7;
+    string z1 = 8;
+    string z2 = 9;
+    string w1 = 10;
+    string w2 = 11;
+    string vletter = 12;
+}

@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package legend.tsslib.crypto.affproof;
+
+option go_package = "crypto/affproof";
+
+message PaillierAffAndGroupRangeMessage {
+    bytes salt = 1;
+    bytes S = 2;
+    bytes T = 3;
+    bytes A = 4;
+    bytes Bx = 5;
+    bytes By = 6;
+    bytes E = 7;
+    bytes F = 8; 
+    string z1 = 9;
+    string z2 = 10;
+    string z3 = 11;
+    string z4 = 12;
+    bytes w = 13;
+    bytes wy = 14;
+}
+
+message PaillierOperationAndCommitmentMessage {
+    bytes salt = 1;
+    bytes S = 2;
+    bytes T = 3;
+    bytes A = 4;
+    bytes Bx = 5;
+    bytes By = 6;
+    bytes E = 7;
+    bytes F = 8; 
+    string z1 = 9;
+    string z2 = 10;
+    string z3 = 11;
+    string z4 = 12;
+    bytes w = 13;
+    bytes wx =14;
+    bytes wy = 15;
+}

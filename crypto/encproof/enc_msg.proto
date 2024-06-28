@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package legend.tsslib.crypto.encproof;
+
+option go_package = "crypto/encproof";
+
+message EncryptRangeMessage {
+    bytes salt = 1;
+    bytes S = 2;
+    bytes A = 3;
+    bytes C = 4;
+    string z1 = 5;
+    bytes z2 = 6;
+    string z3 = 7;
+}
