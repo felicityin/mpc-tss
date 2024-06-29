@@ -2,6 +2,7 @@ package auxiliary
 
 import (
 	"encoding/json"
+	"math/big"
 	"os"
 	"runtime"
 	"sync/atomic"
@@ -13,6 +14,7 @@ import (
 	"mpc_tss/cggmp/non_threshold/keygen"
 	"mpc_tss/cggmp/non_threshold/test"
 	"mpc_tss/common"
+	"mpc_tss/crypto/paillier"
 	"mpc_tss/tss"
 )
 
@@ -27,15 +29,35 @@ func setUp(level string) {
 	}
 }
 
+func TestE2EPreConcurrentWithPre(t *testing.T) {
+	big1 := big.NewInt(1)
+	P, _ := new(big.Int).SetString("104975615121222854384410219330480259027041155688835759631647658735069527864919393410352284436544267374160206678331198777612866309766581999589789442827625308608614590850591998897357449886061863686453412019330757447743487422636807387508460941025550338019105820406950462187693188000168607236389735877001362796259", 10)
+	Q, _ := new(big.Int).SetString("102755306389915984635356782597494195047102560555160692696207839728487252530690043689166546890155633162017964085393843240989395317546293846694693801865924045225783240995686020308553449158438908412088178393717793204697268707791329981413862246773904710409946848630083569401668855899757371993960961231481357354607", 10)
+	N := new(big.Int).Mul(P, Q)
+
+	// phiN = P-1 * Q-1
+	PMinus1, QMinus1 := new(big.Int).Sub(P, big1), new(big.Int).Sub(Q, big1)
+	phiN := new(big.Int).Mul(PMinus1, QMinus1)
+
+	// lambdaN = lcm(P−1, Q−1)
+	gcd := new(big.Int).GCD(nil, nil, PMinus1, QMinus1)
+	lambdaN := new(big.Int).Div(phiN, gcd)
+
+	publicKey := &paillier.PublicKey{N: N}
+	privateKey := &paillier.PrivateKey{PublicKey: *publicKey, LambdaN: lambdaN, PhiN: phiN, P: P, Q: Q}
+
+	testEcdsaE2EConcurrentAndSaveFixtures(t, keygen.Ecdsa, privateKey)
+}
+
 func TestEcdsaE2EConcurrentAndSaveFixtures(t *testing.T) {
-	testEcdsaE2EConcurrentAndSaveFixtures(t, keygen.Ecdsa)
+	testEcdsaE2EConcurrentAndSaveFixtures(t, keygen.Ecdsa, nil)
 }
 
 func TestEddsaE2EConcurrentAndSaveFixtures(t *testing.T) {
-	testEcdsaE2EConcurrentAndSaveFixtures(t, keygen.Eddsa)
+	testEcdsaE2EConcurrentAndSaveFixtures(t, keygen.Eddsa, nil)
 }
 
-func testEcdsaE2EConcurrentAndSaveFixtures(t *testing.T, kind int) {
+func testEcdsaE2EConcurrentAndSaveFixtures(t *testing.T, kind int, sk *paillier.PrivateKey) {
 	setUp("debug")
 
 	threshold := testThreshold
@@ -58,13 +80,9 @@ func testEcdsaE2EConcurrentAndSaveFixtures(t *testing.T, kind int) {
 
 	// init the parties
 	for i := 0; i < len(pIDs); i++ {
-		var params *tss.Parameters
-		if kind == keygen.Ecdsa {
-			params = tss.NewParameters(tss.S256(), p2pCtx, pIDs[i], len(pIDs), threshold)
-		} else {
-			params = tss.NewParameters(tss.Edwards(), p2pCtx, pIDs[i], len(pIDs), threshold)
-		}
+		params := tss.NewParameters(nil, p2pCtx, pIDs[i], len(pIDs), threshold)
 		P := NewLocalParty(params, outCh, endCh).(*LocalParty)
+		P.data.PaillierSK = sk
 		parties = append(parties, P)
 		go func(P *LocalParty) {
 			if err := P.Start(); err != nil {

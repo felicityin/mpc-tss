@@ -8,7 +8,6 @@ import (
 	"strconv"
 
 	"mpc_tss/common"
-	"mpc_tss/crypto"
 	"mpc_tss/crypto/alice/utils"
 	paillierzkproof "mpc_tss/crypto/alice/zkproof/paillier"
 	"mpc_tss/crypto/facproof"
@@ -97,10 +96,9 @@ func (round *round3) Start() *tss.Error {
 	}
 
 	// P2P send fac proof
-	proofParameter := crypto.NewProofConfig(round.EC().Params().N)
 	for j, Pj := range round.Parties().IDs() {
 		facProof, err := facproof.NewNoSmallFactorMessage(
-			proofParameter,
+			ProofParameter,
 			round.temp.ssid,
 			round.temp.rho,
 			round.save.PaillierSK.P,

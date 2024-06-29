@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"mpc_tss/common"
-	"mpc_tss/crypto"
 	"mpc_tss/tss"
 )
 
@@ -19,7 +18,6 @@ func (round *round4) Start() *tss.Error {
 
 	i := round.PartyID().Index
 	common.Logger.Infof("party: %d, round_4 start", i)
-	proofParameter := crypto.NewProofConfig(round.EC().Params().N)
 
 	for j, msg := range round.temp.auxRound3Messages {
 		if j == i {
@@ -34,7 +32,7 @@ func (round *round4) Start() *tss.Error {
 			return round.WrapError(fmt.Errorf("[j: %d] unmarshal fac proof failed", j))
 		}
 
-		if err := facProof.Verify(proofParameter, round.temp.ssid, round.temp.rho,
+		if err := facProof.Verify(ProofParameter, round.temp.ssid, round.temp.rho,
 			round.save.PaillierPKs[j].N, round.save.PedersenPKs[i]); err != nil {
 			common.Logger.Errorf("verify prm proof failed, party: %d", j)
 			return round.WrapError(err)

@@ -85,7 +85,7 @@ func (round *base) resetOK() {
 
 // get ssid from local params
 func (round *base) getSSID() ([]byte, error) {
-	ssidList := []*big.Int{round.EC().Params().P, round.EC().Params().N, round.EC().Params().Gx, round.EC().Params().Gy} // ec curve
+	ssidList := []*big.Int{}
 	ssidList = append(ssidList, round.Parties().IDs().Keys()...)
 	ssidList = append(ssidList, big.NewInt(int64(round.number))) // round number
 	ssidList = append(ssidList, round.temp.ssidNonce)

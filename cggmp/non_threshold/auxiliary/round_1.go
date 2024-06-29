@@ -8,11 +8,13 @@ import (
 	"strconv"
 
 	"mpc_tss/common"
+	"mpc_tss/crypto"
 	paillierzkproof "mpc_tss/crypto/alice/zkproof/paillier"
 	"mpc_tss/crypto/modproof"
-	"mpc_tss/crypto/paillier"
 	"mpc_tss/tss"
 )
+
+var ProofParameter = crypto.NewProofConfig(tss.S256().Params().N)
 
 // round 1 represents round 1 of the keygen part of the EDDSA TSS spec
 func newRound1(
@@ -50,28 +52,24 @@ func (round *round1) Start() *tss.Error {
 	}
 	round.temp.ssid = ssid
 
-	var paillierSk *paillier.PrivateKey
-	{
-		ctx, cancel := context.WithTimeout(context.Background(), round.SafePrimeGenTimeout())
-		defer cancel()
-		paillierSk, err = GeneratePreParamsWithContextAndRandom(ctx, round.Rand(), round.Concurrency())
-		if err != nil {
-			return round.WrapError(errors.New("paillier sk generation failed"), Pi)
+	if round.save.PaillierSK == nil {
+		{
+			ctx, cancel := context.WithTimeout(context.Background(), round.SafePrimeGenTimeout())
+			defer cancel()
+			round.save.PaillierSK, err = GeneratePreParamsWithContextAndRandom(ctx, round.Rand(), round.Concurrency())
+			if err != nil {
+				return round.WrapError(errors.New("paillier sk generation failed"), Pi)
+			}
 		}
 	}
-	round.save.PaillierSK = paillierSk
-	round.save.PaillierPKs[i] = &paillierSk.PublicKey
+	round.save.PaillierPKs[i] = &round.save.PaillierSK.PublicKey
 
 	// Set pedersen parameter from paillierKey: Sample r in Z_N^ast, lambda = Z_phi(N), t = r^2 and s = t^lambda mod N
-	pedersen, err := paillierSk.NewPedersenParameterByPaillier()
+	pedersen, err := round.save.PaillierSK.NewPedersenParameterByPaillier()
 	if err != nil {
 		common.Logger.Errorf("generate ring-pedersen keys failed")
 		return round.WrapError(errors.New("generate ring-pedersen keys failed"), Pi)
 	}
-	// round.save.PedersenSK = &pailliera.PedPrivKey{
-	// 	LambdaN: pedersen.Getlambda(),
-	// 	Euler:   pedersen.GetEulerValue(),
-	// }
 	round.save.PedersenPKs[i] = pedersen.PedersenOpenParameter
 
 	// Generate prm proof
