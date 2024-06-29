@@ -21,8 +21,8 @@ import (
 )
 
 const (
-	testParticipants = 2
-	testThreshold    = 2
+	testParticipants = 3
+	testThreshold    = 3
 )
 
 func setUp(level string) {
