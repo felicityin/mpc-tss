@@ -3,7 +3,7 @@ package paillier
 import (
 	"testing"
 
-	paillierzkproof "mpc_tss/crypto/alice/zkproof/paillier"
+	paillierzkproof "github.com/felicityin/mpc-tss/crypto/alice/zkproof/paillier"
 
 	"github.com/stretchr/testify/assert"
 )

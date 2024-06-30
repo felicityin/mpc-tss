@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	. "mpc_tss/crypto/modproof"
-	"mpc_tss/crypto/paillier"
+	. "github.com/felicityin/mpc-tss/crypto/modproof"
+	"github.com/felicityin/mpc-tss/crypto/paillier"
 
 	"github.com/stretchr/testify/assert"
 )

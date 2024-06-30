@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	"mpc_tss/common"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/tss"
 )
 
 func (round *round4) Start() *tss.Error {

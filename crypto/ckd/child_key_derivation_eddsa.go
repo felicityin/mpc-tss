@@ -9,10 +9,11 @@ import (
 	"crypto/hmac"
 	"crypto/sha512"
 
-	"mpc_tss/common"
-	"mpc_tss/crypto"
 	"strconv"
 	"strings"
+
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/crypto"
 
 	"github.com/decred/dcrd/dcrec/edwards/v2"
 )

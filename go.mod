@@ -1,4 +1,4 @@
-module mpc_tss
+module github.com/felicityin/mpc-tss
 
 go 1.18
 

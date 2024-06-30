@@ -1,4 +1,4 @@
-// Reference: https://github.com/antalpha-com/MPC_ECDSA/blob/main/pkg/math/sample/prime.go
+// Reference: https://github.com/taurushq-io/multi-party-sig/blob/4d84aafb57b437da1b933db9a265fb7ce4e7c138/pkg/math/sample/prime.go
 
 package sample
 
@@ -8,7 +8,7 @@ import (
 	"math/big"
 	"sync"
 
-	"mpc_tss/common/pool"
+	"github.com/felicityin/mpc-tss/common/pool"
 )
 
 const (

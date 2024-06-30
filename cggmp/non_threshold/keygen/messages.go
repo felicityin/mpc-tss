@@ -4,9 +4,9 @@ import (
 	"crypto/elliptic"
 	"math/big"
 
-	"mpc_tss/common"
-	"mpc_tss/crypto"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/crypto"
+	"github.com/felicityin/mpc-tss/tss"
 )
 
 // These messages were generated from Protocol Buffers definitions into eddsa-keygen.pb.go

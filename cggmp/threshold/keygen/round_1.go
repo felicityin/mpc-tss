@@ -5,11 +5,11 @@ import (
 	"math/big"
 	"strconv"
 
-	"mpc_tss/common"
-	"mpc_tss/crypto"
-	cmts "mpc_tss/crypto/commitments"
-	"mpc_tss/crypto/vss"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/crypto"
+	cmts "github.com/felicityin/mpc-tss/crypto/commitments"
+	"github.com/felicityin/mpc-tss/crypto/vss"
+	"github.com/felicityin/mpc-tss/tss"
 )
 
 var zero = big.NewInt(0)

@@ -18,7 +18,7 @@ import (
 
 	"github.com/decred/dcrd/dcrec/edwards/v2"
 
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/tss"
 )
 
 // ECPoint convenience helper

@@ -13,7 +13,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"mpc_tss/common"
+	"github.com/felicityin/mpc-tss/common"
 )
 
 const (

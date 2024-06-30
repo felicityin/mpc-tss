@@ -12,7 +12,7 @@ import (
 	"reflect"
 	"testing"
 
-	"mpc_tss/common"
+	"github.com/felicityin/mpc-tss/common"
 )
 
 func TestRejectionSample(t *testing.T) {

@@ -6,12 +6,12 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"mpc_tss/common"
-	"mpc_tss/crypto"
-	"mpc_tss/crypto/affproof"
-	"mpc_tss/crypto/encproof"
-	"mpc_tss/crypto/logproof"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/crypto"
+	"github.com/felicityin/mpc-tss/crypto/affproof"
+	"github.com/felicityin/mpc-tss/crypto/encproof"
+	"github.com/felicityin/mpc-tss/crypto/logproof"
+	"github.com/felicityin/mpc-tss/tss"
 )
 
 // These messages were generated from Protocol Buffers definitions into eddsa-signing.pb.go

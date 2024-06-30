@@ -11,7 +11,7 @@ import (
 	"io"
 	"math/big"
 
-	"mpc_tss/common"
+	"github.com/felicityin/mpc-tss/common"
 )
 
 const (

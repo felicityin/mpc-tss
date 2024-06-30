@@ -6,10 +6,10 @@ import (
 	"math/big"
 	"strconv"
 
-	"mpc_tss/common"
-	"mpc_tss/crypto/alice/utils"
-	"mpc_tss/crypto/schnorr"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/crypto/alice/utils"
+	"github.com/felicityin/mpc-tss/crypto/schnorr"
+	"github.com/felicityin/mpc-tss/tss"
 )
 
 func (round *round3) Start() *tss.Error {

@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"sync"
 
-	"mpc_tss/common"
+	"github.com/felicityin/mpc-tss/common"
 )
 
 type Party interface {

@@ -6,10 +6,10 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"mpc_tss/common"
-	"mpc_tss/crypto"
-	"mpc_tss/crypto/logproof"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/crypto"
+	"github.com/felicityin/mpc-tss/crypto/logproof"
+	"github.com/felicityin/mpc-tss/tss"
 )
 
 func (round *round2) Start() *tss.Error {

@@ -13,9 +13,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"mpc_tss/common"
-	. "mpc_tss/crypto/vss"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/common"
+	. "github.com/felicityin/mpc-tss/crypto/vss"
+	"github.com/felicityin/mpc-tss/tss"
 )
 
 func TestCheckIndexesDup(t *testing.T) {

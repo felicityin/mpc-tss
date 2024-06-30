@@ -8,9 +8,9 @@ import (
 	"errors"
 	"math/big"
 
-	"mpc_tss/crypto"
-	"mpc_tss/crypto/alice/utils"
-	zkPaillier "mpc_tss/crypto/alice/zkproof/paillier"
+	"github.com/felicityin/mpc-tss/crypto"
+	"github.com/felicityin/mpc-tss/crypto/alice/utils"
+	zkPaillier "github.com/felicityin/mpc-tss/crypto/alice/zkproof/paillier"
 )
 
 var big1 = big.NewInt(1)

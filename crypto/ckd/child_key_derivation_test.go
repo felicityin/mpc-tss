@@ -9,7 +9,7 @@ package ckd_test
 import (
 	"testing"
 
-	. "mpc_tss/crypto/ckd"
+	. "github.com/felicityin/mpc-tss/crypto/ckd"
 
 	"github.com/btcsuite/btcd/btcec"
 )

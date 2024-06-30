@@ -11,9 +11,9 @@ import (
 
 	"github.com/pkg/errors"
 
-	"mpc_tss/cggmp/non_threshold/test"
-	"mpc_tss/common"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/cggmp/non_threshold/test"
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/tss"
 )
 
 const (

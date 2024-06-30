@@ -5,12 +5,12 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"mpc_tss/common"
-	zkPaillier "mpc_tss/crypto/alice/zkproof/paillier"
-	"mpc_tss/crypto/facproof"
-	"mpc_tss/crypto/modproof"
-	"mpc_tss/crypto/paillier"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/common"
+	zkPaillier "github.com/felicityin/mpc-tss/crypto/alice/zkproof/paillier"
+	"github.com/felicityin/mpc-tss/crypto/facproof"
+	"github.com/felicityin/mpc-tss/crypto/modproof"
+	"github.com/felicityin/mpc-tss/crypto/paillier"
+	"github.com/felicityin/mpc-tss/tss"
 )
 
 // These messages were generated from Protocol Buffers definitions into eddsa-keygen.pb.go

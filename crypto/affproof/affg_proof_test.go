@@ -7,9 +7,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"mpc_tss/crypto"
-	zkPaillier "mpc_tss/crypto/alice/zkproof/paillier"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/crypto"
+	zkPaillier "github.com/felicityin/mpc-tss/crypto/alice/zkproof/paillier"
+	"github.com/felicityin/mpc-tss/tss"
 )
 
 var (

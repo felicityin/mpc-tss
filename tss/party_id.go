@@ -12,7 +12,7 @@ import (
 	"math/big"
 	"sort"
 
-	"mpc_tss/common"
+	"github.com/felicityin/mpc-tss/common"
 )
 
 type (

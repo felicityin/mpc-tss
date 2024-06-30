@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"math/big"
 
-	"mpc_tss/common"
-	paillierzkproof "mpc_tss/crypto/alice/zkproof/paillier"
-	"mpc_tss/crypto/modproof"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/common"
+	paillierzkproof "github.com/felicityin/mpc-tss/crypto/alice/zkproof/paillier"
+	"github.com/felicityin/mpc-tss/crypto/modproof"
+	"github.com/felicityin/mpc-tss/tss"
 )
 
 // Implements Party

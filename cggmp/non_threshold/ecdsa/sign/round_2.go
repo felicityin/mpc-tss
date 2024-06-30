@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"math/big"
 
-	"mpc_tss/common"
-	"mpc_tss/crypto"
-	"mpc_tss/crypto/alice/mta"
-	"mpc_tss/crypto/logproof"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/crypto"
+	"github.com/felicityin/mpc-tss/crypto/alice/mta"
+	"github.com/felicityin/mpc-tss/crypto/logproof"
+	"github.com/felicityin/mpc-tss/tss"
 )
 
 func (round *round2) Start() *tss.Error {

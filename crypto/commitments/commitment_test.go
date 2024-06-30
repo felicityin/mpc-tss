@@ -13,7 +13,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	. "mpc_tss/crypto/commitments"
+	. "github.com/felicityin/mpc-tss/crypto/commitments"
 )
 
 func TestCreateVerify(t *testing.T) {

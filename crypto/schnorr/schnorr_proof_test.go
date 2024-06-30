@@ -12,10 +12,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"mpc_tss/common"
-	"mpc_tss/crypto"
-	. "mpc_tss/crypto/schnorr"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/crypto"
+	. "github.com/felicityin/mpc-tss/crypto/schnorr"
+	"github.com/felicityin/mpc-tss/tss"
 )
 
 var Session = []byte("session")

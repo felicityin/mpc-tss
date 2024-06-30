@@ -15,10 +15,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"mpc_tss/common"
-	"mpc_tss/crypto"
-	. "mpc_tss/crypto/paillier"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/crypto"
+	. "github.com/felicityin/mpc-tss/crypto/paillier"
+	"github.com/felicityin/mpc-tss/tss"
 )
 
 // Using a modulus length of 2048 is recommended in the GG18 spec

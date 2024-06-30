@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"math/big"
 
-	"mpc_tss/crypto"
-	"mpc_tss/crypto/alice/utils"
-	zKpaillier "mpc_tss/crypto/alice/zkproof/paillier"
+	"github.com/felicityin/mpc-tss/crypto"
+	"github.com/felicityin/mpc-tss/crypto/alice/utils"
+	zKpaillier "github.com/felicityin/mpc-tss/crypto/alice/zkproof/paillier"
 
 	errors2 "github.com/pkg/errors"
 )

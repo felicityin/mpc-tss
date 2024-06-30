@@ -6,11 +6,11 @@ import (
 	"math/big"
 	"strconv"
 
-	"mpc_tss/common"
-	"mpc_tss/crypto"
-	paillierzkproof "mpc_tss/crypto/alice/zkproof/paillier"
-	"mpc_tss/crypto/modproof"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/crypto"
+	paillierzkproof "github.com/felicityin/mpc-tss/crypto/alice/zkproof/paillier"
+	"github.com/felicityin/mpc-tss/crypto/modproof"
+	"github.com/felicityin/mpc-tss/tss"
 )
 
 var ProofParameter = crypto.NewProofConfig(tss.S256().Params().N)

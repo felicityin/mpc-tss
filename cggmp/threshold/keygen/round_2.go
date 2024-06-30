@@ -3,8 +3,8 @@ package keygen
 import (
 	"errors"
 
-	"mpc_tss/common"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/tss"
 )
 
 func (round *round2) Start() *tss.Error {

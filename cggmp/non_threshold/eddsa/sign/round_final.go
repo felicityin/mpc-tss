@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"math/big"
 
-	"mpc_tss/common"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/tss"
 
 	"github.com/agl/ed25519/edwards25519"
 	edwards "github.com/decred/dcrd/dcrec/edwards/v2"

@@ -14,10 +14,10 @@ import (
 	"runtime"
 	"time"
 
-	"mpc_tss/common"
-	"mpc_tss/common/pool"
-	"mpc_tss/common/sample"
-	"mpc_tss/crypto/paillier"
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/common/pool"
+	"github.com/felicityin/mpc-tss/common/sample"
+	"github.com/felicityin/mpc-tss/crypto/paillier"
 )
 
 var big1 = big.NewInt(1)

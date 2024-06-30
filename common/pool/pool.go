@@ -1,4 +1,4 @@
-// Copy from: https://github.com/antalpha-com/MPC_ECDSA/blob/main/pkg/pool/pool.go
+// Copy from: https://github.com/taurushq-io/multi-party-sig/blob/4d84aafb57b437da1b933db9a265fb7ce4e7c138/pkg/pool/pool.go
 
 package pool
 

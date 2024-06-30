@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"math/big"
 
-	"mpc_tss/common"
-	"mpc_tss/crypto"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/crypto"
+	"github.com/felicityin/mpc-tss/tss"
 )
 
 // Implements Party

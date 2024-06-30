@@ -15,11 +15,11 @@ import (
 	"github.com/ipfs/go-log"
 	"github.com/stretchr/testify/assert"
 
-	"mpc_tss/cggmp/non_threshold/test"
-	"mpc_tss/common"
-	"mpc_tss/crypto"
-	"mpc_tss/crypto/vss"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/cggmp/non_threshold/test"
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/crypto"
+	"github.com/felicityin/mpc-tss/crypto/vss"
+	"github.com/felicityin/mpc-tss/tss"
 )
 
 const (

@@ -7,13 +7,13 @@ import (
 	"math/big"
 	"strconv"
 
-	"mpc_tss/common"
-	"mpc_tss/crypto"
-	"mpc_tss/crypto/alice/utils"
-	"mpc_tss/crypto/commitments"
-	"mpc_tss/crypto/schnorr"
-	"mpc_tss/crypto/vss"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/crypto"
+	"github.com/felicityin/mpc-tss/crypto/alice/utils"
+	"github.com/felicityin/mpc-tss/crypto/commitments"
+	"github.com/felicityin/mpc-tss/crypto/schnorr"
+	"github.com/felicityin/mpc-tss/crypto/vss"
+	"github.com/felicityin/mpc-tss/tss"
 )
 
 func (round *round3) Start() *tss.Error {

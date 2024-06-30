@@ -14,12 +14,13 @@ import (
 	"fmt"
 	"hash"
 	"math/big"
-	"mpc_tss/tss"
 	"strconv"
 	"strings"
 
-	"mpc_tss/common"
-	"mpc_tss/crypto"
+	"github.com/felicityin/mpc-tss/tss"
+
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/crypto"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcutil/base58"

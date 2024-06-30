@@ -4,8 +4,8 @@ import (
 	"encoding/hex"
 	"math/big"
 
-	"mpc_tss/crypto"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/crypto"
+	"github.com/felicityin/mpc-tss/tss"
 )
 
 type (

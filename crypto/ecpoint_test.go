@@ -17,8 +17,8 @@ import (
 	"github.com/decred/dcrd/dcrec/edwards/v2"
 	"github.com/stretchr/testify/assert"
 
-	. "mpc_tss/crypto"
-	"mpc_tss/tss"
+	. "github.com/felicityin/mpc-tss/crypto"
+	"github.com/felicityin/mpc-tss/tss"
 )
 
 func TestFlattenECPoints(t *testing.T) {

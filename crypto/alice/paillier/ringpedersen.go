@@ -17,9 +17,9 @@ package paillier
 import (
 	"math/big"
 
-	zkPaillier "mpc_tss/crypto/alice/zkproof/paillier"
+	zkPaillier "github.com/felicityin/mpc-tss/crypto/alice/zkproof/paillier"
 
-	"mpc_tss/crypto/alice/utils"
+	"github.com/felicityin/mpc-tss/crypto/alice/utils"
 )
 
 type (

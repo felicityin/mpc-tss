@@ -5,9 +5,9 @@ import (
 	"math/big"
 	"strconv"
 
-	"mpc_tss/common"
-	"mpc_tss/crypto"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/crypto"
+	"github.com/felicityin/mpc-tss/tss"
 )
 
 // round 1 represents round 1 of the keygen part of the EDDSA TSS spec

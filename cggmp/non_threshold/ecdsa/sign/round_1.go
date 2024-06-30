@@ -4,12 +4,12 @@ import (
 	"errors"
 	"math/big"
 
-	"mpc_tss/cggmp/non_threshold/auxiliary"
-	"mpc_tss/cggmp/non_threshold/keygen"
-	"mpc_tss/common"
-	"mpc_tss/crypto"
-	"mpc_tss/crypto/encproof"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/cggmp/non_threshold/auxiliary"
+	"github.com/felicityin/mpc-tss/cggmp/non_threshold/keygen"
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/crypto"
+	"github.com/felicityin/mpc-tss/crypto/encproof"
+	"github.com/felicityin/mpc-tss/tss"
 )
 
 var ProofParameter = crypto.NewProofConfig(tss.S256().Params().N)

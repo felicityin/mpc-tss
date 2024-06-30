@@ -27,11 +27,11 @@ import (
 
 	"github.com/otiai10/primes"
 
-	"mpc_tss/common"
-	crypto2 "mpc_tss/crypto"
-	pailliera "mpc_tss/crypto/alice/paillier"
-	"mpc_tss/crypto/alice/utils"
-	zkPaillier "mpc_tss/crypto/alice/zkproof/paillier"
+	"github.com/felicityin/mpc-tss/common"
+	crypto2 "github.com/felicityin/mpc-tss/crypto"
+	pailliera "github.com/felicityin/mpc-tss/crypto/alice/paillier"
+	"github.com/felicityin/mpc-tss/crypto/alice/utils"
+	zkPaillier "github.com/felicityin/mpc-tss/crypto/alice/zkproof/paillier"
 )
 
 const (

@@ -7,8 +7,8 @@ import (
 	"github.com/agl/ed25519/edwards25519"
 	"github.com/pkg/errors"
 
-	"mpc_tss/common"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/tss"
 )
 
 func (round *round3) Start() *tss.Error {

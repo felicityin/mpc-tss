@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"math/big"
 
-	"mpc_tss/cggmp/non_threshold/auxiliary"
-	"mpc_tss/cggmp/non_threshold/keygen"
+	"github.com/felicityin/mpc-tss/cggmp/non_threshold/auxiliary"
+	"github.com/felicityin/mpc-tss/cggmp/non_threshold/keygen"
 
-	"mpc_tss/common"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/tss"
 )
 
 // Implements Party

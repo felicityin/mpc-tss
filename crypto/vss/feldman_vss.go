@@ -17,8 +17,8 @@ import (
 	"io"
 	"math/big"
 
-	"mpc_tss/common"
-	"mpc_tss/crypto"
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/crypto"
 )
 
 type (

@@ -18,7 +18,7 @@ import (
 	"errors"
 	"math/big"
 
-	"mpc_tss/crypto/alice/utils"
+	"github.com/felicityin/mpc-tss/crypto/alice/utils"
 )
 
 const (

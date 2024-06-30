@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"math/big"
 
-	"mpc_tss/common"
-	"mpc_tss/crypto"
-	cmt "mpc_tss/crypto/commitments"
-	"mpc_tss/crypto/vss"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/crypto"
+	cmt "github.com/felicityin/mpc-tss/crypto/commitments"
+	"github.com/felicityin/mpc-tss/crypto/vss"
+	"github.com/felicityin/mpc-tss/tss"
 
 	"github.com/ipfs/go-log"
 )

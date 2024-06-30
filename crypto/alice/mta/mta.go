@@ -19,14 +19,14 @@ import (
 	"io"
 	"math/big"
 
-	"mpc_tss/common"
-	"mpc_tss/crypto"
-	"mpc_tss/crypto/affproof"
-	pailliera "mpc_tss/crypto/alice/paillier"
-	"mpc_tss/crypto/alice/utils"
-	zkPaillier "mpc_tss/crypto/alice/zkproof/paillier"
-	"mpc_tss/crypto/paillier"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/crypto"
+	"github.com/felicityin/mpc-tss/crypto/affproof"
+	pailliera "github.com/felicityin/mpc-tss/crypto/alice/paillier"
+	"github.com/felicityin/mpc-tss/crypto/alice/utils"
+	zkPaillier "github.com/felicityin/mpc-tss/crypto/alice/zkproof/paillier"
+	"github.com/felicityin/mpc-tss/crypto/paillier"
+	"github.com/felicityin/mpc-tss/tss"
 )
 
 var (

@@ -7,11 +7,11 @@ import (
 	"math/big"
 	"strconv"
 
-	"mpc_tss/common"
-	"mpc_tss/crypto/alice/utils"
-	paillierzkproof "mpc_tss/crypto/alice/zkproof/paillier"
-	"mpc_tss/crypto/facproof"
-	"mpc_tss/tss"
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/crypto/alice/utils"
+	paillierzkproof "github.com/felicityin/mpc-tss/crypto/alice/zkproof/paillier"
+	"github.com/felicityin/mpc-tss/crypto/facproof"
+	"github.com/felicityin/mpc-tss/tss"
 
 	"github.com/golang/protobuf/proto"
 )

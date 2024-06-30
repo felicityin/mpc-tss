@@ -7,8 +7,8 @@ import (
 	edwards "github.com/decred/dcrd/dcrec/edwards/v2"
 	"github.com/stretchr/testify/assert"
 
-	"mpc_tss/crypto"
-	zkPaillier "mpc_tss/crypto/alice/zkproof/paillier"
+	"github.com/felicityin/mpc-tss/crypto"
+	zkPaillier "github.com/felicityin/mpc-tss/crypto/alice/zkproof/paillier"
 )
 
 var (
