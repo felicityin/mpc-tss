@@ -62,6 +62,10 @@ func (round *round2) Start() *tss.Error {
 
 	// p2p send log proof to Pj
 	for j, Pj := range round.Parties().IDs() {
+		if j == i {
+			round.ok[j] = true
+			continue
+		}
 		// logProof for the secret k, rho: M(prove, Πlog, (sid,i), (Iε,Ki,Ri,g); (ki,rhoi))
 		logProof, err := logproof.NewKnowExponentAndPaillierEncryption(
 			ProofParameter, contextI, round.temp.k, round.temp.rho, round.temp.kCiphertexts[i],
@@ -91,10 +95,6 @@ func (round *round2) Start() *tss.Error {
 
 		common.Logger.Debugf("P[%d]: send log proof to P[%d]", i, j)
 		r2msg := NewSignRound2Message(Pj, round.PartyID(), Ri, logProofBytes)
-		if j == i {
-			round.temp.signRound2Messages[i] = r2msg
-			continue
-		}
 		round.out <- r2msg
 	}
 

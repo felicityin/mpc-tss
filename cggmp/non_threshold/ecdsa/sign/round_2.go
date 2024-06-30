@@ -59,8 +59,12 @@ func (round *round2) Start() *tss.Error {
 	common.Logger.Debugf("P[%d]: calc Gammai", i)
 	round.temp.Gamma = crypto.ScalarBaseMult(round.EC(), round.temp.gamma)
 
-	// P2P send proofs to Pj
+	// Generates proofs for Pj
 	for j, Pj := range round.Parties().IDs() {
+		if j == i {
+			round.ok[j] = true
+			continue
+		}
 		// aff-g proof: M(prove, Πaff-g, (sid, i), (Iε, Jε, Dj,i, Kj, Fj,i, Gi); (gammai, βi,j, si,j, ri,j))
 		negBeta, countDelta, r, s, D, F, psiProof, err := mta.MtaWithProofAff_g(
 			round.Rand(), contextI, round.aux.PedersenPKs[j], round.aux.PaillierPKs[i],
@@ -99,10 +103,6 @@ func (round *round2) Start() *tss.Error {
 		)
 		if err != nil {
 			return round.WrapError(err, Pj)
-		}
-		if j == i {
-			round.temp.signRound2Messages[i] = r2msg
-			continue
 		}
 		round.out <- r2msg
 	}

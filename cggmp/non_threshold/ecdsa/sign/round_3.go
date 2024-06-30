@@ -135,6 +135,10 @@ func (round *round3) Start() *tss.Error {
 	// P2P send log proof to Pj
 	contextI := append(round.temp.ssid, big.NewInt(int64(i)).Bytes()...)
 	for j, Pj := range round.Parties().IDs() {
+		if j == i {
+			round.ok[j] = true
+			continue
+		}
 		// log proof: M(prove, Πlog, (ssid, i), (Iε, Ki, ∆i, Γ); (ki, ρi))
 		logProof, err := logproof.NewKnowExponentAndPaillierEncryption(
 			ProofParameter, contextI, round.temp.k, round.temp.rho, round.temp.kCiphertexts[i],
@@ -149,10 +153,6 @@ func (round *round3) Start() *tss.Error {
 		r3msg, err := NewSignRound3Message(Pj, round.PartyID(), delta, round.temp.Delta, logProof)
 		if err != nil {
 			return round.WrapError(err, Pj)
-		}
-		if j == i {
-			round.temp.signRound3Messages[i] = r3msg
-			continue
 		}
 		round.out <- r3msg
 	}

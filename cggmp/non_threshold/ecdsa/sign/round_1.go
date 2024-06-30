@@ -81,6 +81,10 @@ func (round *round1) Start() *tss.Error {
 
 	// p2p send enc proof to Pj
 	for j, Pj := range round.Parties().IDs() {
+		if j == i {
+			round.ok[j] = true
+			continue
+		}
 		contextJ := append(round.temp.ssid, big.NewInt(int64(j)).Bytes()...)
 
 		// M(prove, Πenc, (sid,i), (Iε,Ki); (ki,rhoi))
@@ -98,10 +102,6 @@ func (round *round1) Start() *tss.Error {
 		r1msg2, err := NewSignRound1Message2(Pj, round.PartyID(), encProof)
 		if err != nil {
 			round.WrapError(err, Pj)
-		}
-		if j == i {
-			round.temp.signRound1Message2s[i] = r1msg2
-			continue
 		}
 		round.out <- r1msg2
 	}

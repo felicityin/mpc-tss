@@ -97,6 +97,10 @@ func (round *round3) Start() *tss.Error {
 
 	// P2P send fac proof
 	for j, Pj := range round.Parties().IDs() {
+		if j == i {
+			round.ok[j] = true
+			continue
+		}
 		facProof, err := facproof.NewNoSmallFactorMessage(
 			ProofParameter,
 			round.temp.ssid,
@@ -116,10 +120,6 @@ func (round *round3) Start() *tss.Error {
 
 		common.Logger.Debugf("P[%d]: send fac proof to P[%d]", i, j)
 		r3msg := NewAuxRound3Message(Pj, round.PartyID(), facProofBytes)
-		if j == i {
-			round.temp.auxRound3Messages[i] = r3msg
-			continue
-		}
 		round.out <- r3msg
 	}
 	return nil

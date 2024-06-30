@@ -93,6 +93,10 @@ func (round *round1) Start() *tss.Error {
 
 	// p2p send enc proof to Pj
 	for j, Pj := range round.Parties().IDs() {
+		if j == i {
+			round.ok[j] = true
+			continue
+		}
 		// M(prove, Πenc, (sid,i), (Iε,Ki); (ki,rhoi))
 		encProof, err := encproof.NewEncryptRangeMessage(ProofParameter, contextI, kCiphertext,
 			round.aux.PaillierPKs[i].N, round.temp.k, round.temp.rho, round.aux.PedersenPKs[j],
@@ -111,10 +115,6 @@ func (round *round1) Start() *tss.Error {
 
 		common.Logger.Debugf("P[%d]: p2p send enc proof", i)
 		r1msg2 := NewSignRound1Message2(Pj, round.PartyID(), encProofBytes)
-		if j == i {
-			round.temp.signRound1Message2s[i] = r1msg2
-			continue
-		}
 		round.out <- r1msg2
 	}
 
