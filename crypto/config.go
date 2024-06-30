@@ -9,10 +9,9 @@ var (
 )
 
 const (
-	LFactor          = 1
-	LpaiFactor       = 5
-	MINIMALCHALLENGE = 10
-	epsilonFactor    = 2
+	LFactor       = 1
+	LpaiFactor    = 5
+	epsilonFactor = 2
 )
 
 type ProofConfig struct {

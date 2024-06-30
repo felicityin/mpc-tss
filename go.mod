@@ -7,6 +7,7 @@ replace github.com/btcsuite/btcutil/hdkeychain v0.0.0-20191219182022-e17c9730c42
 
 //replace github.com/btcsuite/btcd/btcec v0.0.0-20191219182022-e17c9730c422 => github.com/btcsuite/btcd/btcec/v2 v2.2.1
 replace github.com/btcsuite/btcd/btcec => ./package/github.com/btcsuite/btcd/btcec/v1
+
 replace github.com/btcsuite/btcd/btcec/v2 => ./package/github.com/btcsuite/btcd/btcec/v2
 
 require (

@@ -7,7 +7,6 @@ import (
 
 	"github.com/felicityin/mpc-tss/common"
 	paillierzkproof "github.com/felicityin/mpc-tss/crypto/alice/zkproof/paillier"
-	"github.com/felicityin/mpc-tss/crypto/modproof"
 	"github.com/felicityin/mpc-tss/tss"
 )
 
@@ -39,7 +38,6 @@ type (
 		localMessageStore
 
 		prmProof *paillierzkproof.RingPederssenParameterMessage
-		modProof *modproof.ProofMod
 
 		// Echo broadcast and random oracle data seed
 		srid []byte

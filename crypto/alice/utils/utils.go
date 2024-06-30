@@ -393,3 +393,22 @@ func ExtnedHashOuput(salt, message []byte, outputBitLength int) []byte {
 	}
 	return new(big.Int).Rsh(new(big.Int).SetBytes(result), uint((Up<<8)-outputBitLength)).Bytes()
 }
+
+// The hash result is Hash(salt + "," + message +"," + "0") | Hash(salt + "," + message + "," + "1") | .... | Hash(salt + "," + message + "," + "n-1"). Here n := Ceil (outputByteLength/32)
+func ExtendHashOutput(salt, message []byte, outputByteLength int) []byte {
+	separation := []byte(",")
+	Up := int(math.Ceil(float64(outputByteLength) / 32))
+	result := make([]byte, Up<<5)
+	for i := 0; i < Up; i++ {
+		input := append(salt, separation...)
+		input = append(input, message...)
+		input = append(input, separation...)
+		input = append(input, []byte(strconv.Itoa(i))...)
+		temp := blake2b.Sum256(input)
+		up := i << 5
+		for j := 0; j < 32; j++ {
+			result[up+j] = temp[j]
+		}
+	}
+	return result
+}

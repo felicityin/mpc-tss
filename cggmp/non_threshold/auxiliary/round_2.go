@@ -40,7 +40,6 @@ func (round *round2) Start() *tss.Error {
 			round.save.PaillierPKs[i],
 			round.save.PedersenPKs[i],
 			prmProofBytes,
-			round.temp.modProof,
 			round.temp.rho,
 			round.temp.u,
 		)

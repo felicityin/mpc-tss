@@ -1,6 +1,7 @@
 package auxiliary
 
 import (
+	"fmt"
 	"math/big"
 
 	"google.golang.org/protobuf/proto"
@@ -52,7 +53,6 @@ func NewAuxRound2Message(
 	paillierPK *paillier.PublicKey,
 	pedPK *zkPaillier.PederssenOpenParameter,
 	prmProof []byte,
-	modProof *modproof.ProofMod,
 	rho []byte,
 	u []byte,
 ) tss.ParsedMessage {
@@ -60,7 +60,6 @@ func NewAuxRound2Message(
 		From:        from,
 		IsBroadcast: true,
 	}
-	modProofBzs := modProof.Bytes()
 	content := &AuxRound2Message{
 		Ssid:      ssid,
 		Srid:      srid,
@@ -68,7 +67,6 @@ func NewAuxRound2Message(
 		PedersenS: pedPK.S.Bytes(),
 		PedersenT: pedPK.T.Bytes(),
 		PrmProof:  prmProof,
-		ModProof:  modProofBzs[:],
 		Rho:       rho,
 		U:         u,
 	}
@@ -108,26 +106,35 @@ func (m *AuxRound2Message) UnmarshalPrmProof() (*zkPaillier.RingPederssenParamet
 	return prmProof, nil
 }
 
-func (m *AuxRound2Message) UnmarshalModProof() (*modproof.ProofMod, error) {
-	return modproof.NewProofFromBytes(m.GetModProof())
-}
-
 // ----- //
 
 func NewAuxRound3Message(
 	to, from *tss.PartyID,
-	facProof []byte,
-) tss.ParsedMessage {
+	facProof *facproof.NoSmallFactorMessage,
+	modProof *modproof.PaillierBlumMessage,
+) (tss.ParsedMessage, error) {
+	facProofBytes, err := proto.Marshal(facProof)
+	if err != nil {
+		common.Logger.Errorf("marshal fac proof error: %s", err)
+		return nil, fmt.Errorf("marshal fac proof error: %s", err)
+	}
+	modProofBytes, err := proto.Marshal(modProof)
+	if err != nil {
+		common.Logger.Errorf("marshal fac proof error: %s", err)
+		return nil, fmt.Errorf("marshal fac proof error: %s", err)
+	}
+
 	meta := tss.MessageRouting{
 		From:        from,
 		To:          []*tss.PartyID{to},
 		IsBroadcast: false,
 	}
 	content := &AuxRound3Message{
-		FacProof: facProof,
+		FacProof: facProofBytes,
+		ModProof: modProofBytes,
 	}
 	msg := tss.NewMessageWrapper(meta, content)
-	return tss.NewMessage(meta, content, msg)
+	return tss.NewMessage(meta, content, msg), nil
 }
 
 func (m *AuxRound3Message) ValidateBasic() bool {
@@ -140,4 +147,12 @@ func (m *AuxRound3Message) UnmarshalFacProof() (*facproof.NoSmallFactorMessage, 
 		return nil, err
 	}
 	return facProof, nil
+}
+
+func (m *AuxRound3Message) UnmarshalModProof() (*modproof.PaillierBlumMessage, error) {
+	modProof := &modproof.PaillierBlumMessage{}
+	if err := proto.Unmarshal(m.GetModProof(), modProof); err != nil {
+		return nil, err
+	}
+	return modProof, nil
 }

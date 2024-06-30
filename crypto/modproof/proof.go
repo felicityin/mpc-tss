@@ -1,242 +1,254 @@
-// Copyright © 2019-2023 Binance
-//
-// This file is part of Binance. The full Binance copyright notice, including
-// terms governing use, modification, and redistribution, is contained in the
-// file LICENSE at the root of the source code distribution tree.
+// Copyright © 2022 AMIS Technologies
+
+// Copy from: https://github.com/getamis/alice/blob/master/crypto/zkproof/paillier/blummodzkproof.go
 
 package modproof
 
 import (
-	"fmt"
-	"io"
+	"errors"
+	"math"
 	"math/big"
 
-	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/crypto/alice/utils"
+	paillierzkproof "github.com/felicityin/mpc-tss/crypto/alice/zkproof/paillier"
 )
 
 const (
-	Iterations         = 80
-	ProofModBytesParts = Iterations*2 + 3
+	// maxRetry defines the max retries
+	maxRetry = 100
+	// SAFESECURITYLEVEL define the minimal security level
+	SAFESECURITYLEVEL = 2047
 )
 
-var one = big.NewInt(1)
+var (
+	//ErrVerifyFailure is returned if the verification is failure.
+	ErrVerifyFailure = errors.New("the verification is failure")
+	//ErrTooFewChallenge is returned if the times of challenge is too few.
+	ErrTooFewChallenge = errors.New("the times of challenge are too few")
+	//ErrExceedMaxRetry is returned if we retried over times
+	ErrExceedMaxRetry = errors.New("exceed max retries")
+	//ErrInvalidInput is returned if the input is invalid
+	ErrInvalidInput = errors.New("invalid input")
 
-type (
-	ProofMod struct {
-		W *big.Int
-		X [Iterations]*big.Int
-		A *big.Int
-		B *big.Int
-		Z [Iterations]*big.Int
-	}
+	// 2^64 - 1
+	max64Bit = new(big.Int).SetUint64(18446744073709551615)
+	bit32    = new(big.Int).SetUint64(4294967296)
+
+	big0 = big.NewInt(0)
+	big1 = big.NewInt(1)
+	big2 = big.NewInt(2)
+	big4 = big.NewInt(4)
 )
 
-// isQuadraticResidue checks Euler criterion
-func isQuadraticResidue(X, N *big.Int) bool {
-	return big.Jacobi(X, N) == 1
-}
-
-func NewProof(Session []byte, N, P, Q *big.Int, rand io.Reader) (*ProofMod, error) {
-	Phi := new(big.Int).Mul(new(big.Int).Sub(P, one), new(big.Int).Sub(Q, one))
-	// Fig 16.1
-	W := common.GetRandomQuadraticNonResidue(rand, N)
-
-	// Fig 16.2
-	Y := [Iterations]*big.Int{}
-	for i := range Y {
-		ei := common.SHA512_256i_TAGGED(Session, append([]*big.Int{W, N}, Y[:i]...)...)
-		Y[i] = common.RejectionSample(N, ei)
+func NewPaillierBlumMessage(ssidInfo []byte, p *big.Int, q *big.Int, n *big.Int, numberzkProof int) (*PaillierBlumMessage, error) {
+	eulerValue, err := utils.EulerFunction([]*big.Int{p, q})
+	if err != nil {
+		return nil, err
 	}
 
-	// Fig 16.3
-	modN, modPhi := common.ModInt(N), common.ModInt(Phi)
-	invN := new(big.Int).ModInverse(N, Phi)
-	X := [Iterations]*big.Int{}
-	// Fix bitLen of A and B
-	A := new(big.Int).Lsh(one, Iterations)
-	B := new(big.Int).Lsh(one, Iterations)
-	Z := [Iterations]*big.Int{}
+	if numberzkProof < paillierzkproof.MINIMALCHALLENGE {
+		return nil, ErrTooFewChallenge
+	}
+	x := make([][]byte, numberzkProof)
+	a := make([][]byte, numberzkProof)
+	b := make([][]byte, numberzkProof)
+	z := make([][]byte, numberzkProof)
+	salt := make([][]byte, numberzkProof)
 
-	// for fourth-root
-	expo := new(big.Int).Add(Phi, big.NewInt(4))
-	expo = new(big.Int).Rsh(expo, 3)
-	expo = modPhi.Mul(expo, expo)
-
-	for i := range Y {
-		for j := 0; j < 4; j++ {
-			a, b := j&1, j&2>>1
-			Yi := new(big.Int).SetBytes(Y[i].Bytes())
-			if a > 0 {
-				Yi = modN.Mul(big.NewInt(-1), Yi)
-			}
-			if b > 0 {
-				Yi = modN.Mul(W, Yi)
-			}
-			if isQuadraticResidue(Yi, P) && isQuadraticResidue(Yi, Q) {
-				Xi := modN.Exp(Yi, expo)
-				Zi := modN.Exp(Y[i], invN)
-				X[i], Z[i] = Xi, Zi
-				A.SetBit(A, i, uint(a))
-				B.SetBit(B, i, uint(b))
-				break
-			}
+	// Find w in Z_N such that Jacobi(w, N) = -1.
+	w, err := utils.RandomCoprimeInt(n)
+	if err != nil {
+		return nil, err
+	}
+	for j := 0; j < maxRetry; j++ {
+		if err != nil {
+			return nil, err
 		}
+		if big.Jacobi(w, n) == -1 {
+			break
+		}
+		w, err = utils.RandomCoprimeInt(n)
+	}
+	nInverEuler := new(big.Int).ModInverse(n, eulerValue)
+	for i := 0; i < numberzkProof; i++ {
+		salti, err := utils.GenRandomBytes(128)
+		if err != nil {
+			return nil, err
+		}
+		// Challenges {yi in Z_N}_{i=1,...,m}.
+		yi, salti, err := computeyByRejectSampling(w, n, salti, ssidInfo)
+		if err != nil {
+			return nil, err
+		}
+		zi := new(big.Int).Exp(yi, nInverEuler, n)
+		// Compute xi = yi^{1/4} mod N with yi=(-1)^ai*w^bi*yi mod N, where ai, bi in {0,1} such that xi is well-defined.
+		ai, bi, xi := get4thRootWithabValue(yi, w, p, q, n)
+
+		x[i] = xi.Bytes()
+		a[i] = ai.Bytes()
+		b[i] = bi.Bytes()
+		z[i] = zi.Bytes()
+		salt[i] = salti
 	}
 
-	pf := &ProofMod{W: W, X: X, A: A, B: B, Z: Z}
-	return pf, nil
-}
-
-func NewProofFromBytes(bzs [][]byte) (*ProofMod, error) {
-	if !common.NonEmptyMultiBytes(bzs, ProofModBytesParts) {
-		return nil, fmt.Errorf("expected %d byte parts to construct ProofMod", ProofModBytesParts)
-	}
-	bis := make([]*big.Int, len(bzs))
-	for i := range bis {
-		bis[i] = new(big.Int).SetBytes(bzs[i])
-	}
-
-	X := [Iterations]*big.Int{}
-	copy(X[:], bis[1:(Iterations+1)])
-
-	Z := [Iterations]*big.Int{}
-	copy(Z[:], bis[(Iterations+3):])
-
-	return &ProofMod{
-		W: bis[0],
-		X: X,
-		A: bis[Iterations+1],
-		B: bis[Iterations+2],
-		Z: Z,
+	return &PaillierBlumMessage{
+		A:    a,
+		B:    b,
+		W:    w.Bytes(),
+		X:    x,
+		Z:    z,
+		Salt: salt,
 	}, nil
 }
 
-func (pf *ProofMod) Verify(Session []byte, N *big.Int) bool {
-	if pf == nil || !pf.ValidateBasic() {
-		return false
+func (msg *PaillierBlumMessage) Verify(ssidInfo []byte, n *big.Int) error {
+	a := msg.A
+	b := msg.B
+	w := new(big.Int).SetBytes(msg.W)
+	salt := msg.Salt
+	x := msg.X
+	z := msg.Z
+	// check N is an odd composite number.
+	if n.BitLen() < SAFESECURITYLEVEL || n.Cmp(big0) < 0 {
+		return ErrInvalidInput
 	}
-	// TODO: add basic properties checker
-	if isQuadraticResidue(pf.W, N) {
-		return false
+	testTime := 0
+	for i := 0; i < maxRetry; i++ {
+		if !n.ProbablyPrime(1) {
+			break
+		}
+		testTime++
 	}
-	if pf.W.Sign() != 1 || pf.W.Cmp(N) != -1 {
-		return false
+	if testTime == maxRetry {
+		return ErrExceedMaxRetry
 	}
-	for i := range pf.Z {
-		if pf.Z[i].Sign() != 1 || pf.Z[i].Cmp(N) != -1 {
-			return false
+
+	for i := 0; i < len(a); i++ {
+		yi, _, err := computeyByRejectSampling(w, n, salt[i], ssidInfo)
+		if err != nil {
+			return err
+		}
+		// check z in [2, n-1]
+		zi := new(big.Int).SetBytes(z[i])
+		err = utils.InRange(zi, big2, n)
+		if err != nil {
+			return err
+		}
+
+		// check zi^n = yi mod n
+		if new(big.Int).Exp(zi, n, n).Cmp(yi) != 0 {
+			return ErrVerifyFailure
+		}
+		// xi^4 = (-1)^a*w^b*yi mod n
+		ai := new(big.Int).SetBytes(a[i])
+		err = utils.InRange(ai, big0, big2)
+		if err != nil {
+			return err
+		}
+		bi := new(big.Int).SetBytes(b[i])
+		err = utils.InRange(bi, big0, big2)
+		if err != nil {
+			return err
+		}
+
+		rightPary := new(big.Int).Set(yi)
+		if ai.Cmp(big1) == 0 {
+			rightPary.Neg(rightPary)
+		}
+		if bi.Cmp(big1) == 0 {
+			rightPary.Mul(rightPary, w)
+		}
+		rightPary.Mod(rightPary, n)
+
+		if new(big.Int).Exp(new(big.Int).SetBytes(x[i]), big4, n).Cmp(rightPary) != 0 {
+			return ErrVerifyFailure
 		}
 	}
-	for i := range pf.X {
-		if pf.X[i].Sign() != 1 || pf.X[i].Cmp(N) != -1 {
-			return false
-		}
-	}
-	if pf.A.BitLen() != Iterations+1 {
-		return false
-	}
-	if pf.B.BitLen() != Iterations+1 {
-		return false
-	}
-
-	modN := common.ModInt(N)
-	Y := [Iterations]*big.Int{}
-	for i := range Y {
-		ei := common.SHA512_256i_TAGGED(Session, append([]*big.Int{pf.W, N}, Y[:i]...)...)
-		Y[i] = common.RejectionSample(N, ei)
-	}
-
-	// Fig 16. Verification
-	{
-		if N.Bit(0) == 0 || N.ProbablyPrime(30) {
-			return false
-		}
-	}
-
-	chs := make(chan bool, Iterations*2)
-	for i := 0; i < Iterations; i++ {
-		go func(i int) {
-			left := modN.Exp(pf.Z[i], N)
-			if left.Cmp(Y[i]) != 0 {
-				chs <- false
-				return
-			}
-			chs <- true
-		}(i)
-
-		go func(i int) {
-			a := pf.A.Bit(i)
-			b := pf.B.Bit(i)
-			if a != 0 && a != 1 {
-				chs <- false
-				return
-			}
-			if b != 0 && b != 1 {
-				chs <- false
-				return
-			}
-			left := modN.Exp(pf.X[i], big.NewInt(4))
-			right := Y[i]
-			if a > 0 {
-				right = modN.Mul(big.NewInt(-1), right)
-			}
-			if b > 0 {
-				right = modN.Mul(pf.W, right)
-			}
-			if left.Cmp(right) != 0 {
-				chs <- false
-				return
-			}
-			chs <- true
-		}(i)
-	}
-
-	for i := 0; i < Iterations*2; i++ {
-		if !<-chs {
-			return false
-		}
-	}
-
-	return true
+	return nil
 }
 
-func (pf *ProofMod) ValidateBasic() bool {
-	if pf.W == nil {
-		return false
-	}
-	for i := range pf.X {
-		if pf.X[i] == nil {
-			return false
+func computeyByRejectSampling(w *big.Int, n *big.Int, salt []byte, ssidInfo []byte) (*big.Int, []byte, error) {
+	var yi *big.Int
+	ByteLength := int(math.Ceil(float64(n.BitLen()) / 8))
+	desireModular := new(big.Int).Lsh(big1, uint(n.BitLen()))
+	for j := 0; j < maxRetry; j++ {
+		yiSeed, err := utils.HashProtos(salt, utils.GetAnyMsg(ssidInfo, n.Bytes(), w.Bytes())...)
+		if err != nil {
+			return nil, nil, err
 		}
-	}
-	if pf.A == nil {
-		return false
-	}
-	if pf.B == nil {
-		return false
-	}
-	for i := range pf.Z {
-		if pf.Z[i] == nil {
-			return false
+		yi = new(big.Int).SetBytes(utils.ExtendHashOutput(salt, yiSeed, ByteLength))
+		yi.Mod(yi, desireModular)
+		if yi.Cmp(n) > -1 || utils.Gcd(yi, n).Cmp(big1) != 0 {
+			salt, err = utils.GenRandomBytes(128)
+			if err != nil {
+				return nil, nil, err
+			}
+			continue
 		}
+		return yi, salt, nil
 	}
-	return true
+	return nil, nil, ErrExceedMaxRetry
 }
 
-func (pf *ProofMod) Bytes() [ProofModBytesParts][]byte {
-	bzs := [ProofModBytesParts][]byte{}
-	bzs[0] = pf.W.Bytes()
-	for i := range pf.X {
-		if pf.X[i] != nil {
-			bzs[1+i] = pf.X[i].Bytes()
+// In our context, p = 3 mod 4 and q = 3 mod 4.
+func get4thRootWithabValue(y *big.Int, w *big.Int, p *big.Int, q *big.Int, n *big.Int) (*big.Int, *big.Int, *big.Int) {
+	yModp := new(big.Int).Mod(y, p)
+	wModp := new(big.Int).Mod(w, p)
+	yModq := new(big.Int).Mod(y, q)
+	wModq := new(big.Int).Mod(w, q)
+
+	var a, b *big.Int
+	if big.Jacobi(yModp, p) == -1 {
+		if big.Jacobi(yModq, q) == -1 {
+			a = big.NewInt(1)
+			b = big.NewInt(0)
+
+		} else {
+			if big.Jacobi(wModp, p) == -1 {
+				a = big.NewInt(0)
+				b = big.NewInt(1)
+			} else {
+				a = big.NewInt(1)
+				b = big.NewInt(1)
+			}
+		}
+	} else {
+		if big.Jacobi(yModq, q) == -1 {
+			if big.Jacobi(wModp, p) == -1 {
+				a = big.NewInt(1)
+				b = big.NewInt(1)
+
+			} else {
+				a = big.NewInt(0)
+				b = big.NewInt(1)
+
+			}
+		} else {
+			a = big.NewInt(0)
+			b = big.NewInt(0)
 		}
 	}
-	bzs[Iterations+1] = pf.A.Bytes()
-	bzs[Iterations+2] = pf.B.Bytes()
-	for i := range pf.Z {
-		if pf.Z[i] != nil {
-			bzs[Iterations+3+i] = pf.Z[i].Bytes()
-		}
+	resultModp := new(big.Int).Set(yModp)
+	resultModq := new(big.Int).Set(yModq)
+	if a.Cmp(big1) == 0 {
+		resultModp = resultModp.Neg(resultModp)
+		resultModq = resultModq.Neg(resultModq)
 	}
-	return bzs
+	if b.Cmp(big1) == 0 {
+		resultModp.Mul(resultModp, wModp)
+		resultModq.Mul(resultModq, wModq)
+	}
+
+	resultModp.ModSqrt(resultModp, p)
+	resultModp.ModSqrt(resultModp, p)
+	resultModq.ModSqrt(resultModq, q)
+	resultModq.ModSqrt(resultModq, q)
+
+	u := big.NewInt(1)
+	v := big.NewInt(1)
+	new(big.Int).GCD(u, v, p, q)
+	result := new(big.Int).Mul(new(big.Int).Mul(p, u), resultModq)
+	result.Add(result, new(big.Int).Mul(new(big.Int).Mul(q, v), resultModp))
+	result.Mod(result, n)
+	return a, b, result
 }

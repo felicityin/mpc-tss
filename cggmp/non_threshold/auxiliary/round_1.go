@@ -9,7 +9,6 @@ import (
 	"github.com/felicityin/mpc-tss/common"
 	"github.com/felicityin/mpc-tss/crypto"
 	paillierzkproof "github.com/felicityin/mpc-tss/crypto/alice/zkproof/paillier"
-	"github.com/felicityin/mpc-tss/crypto/modproof"
 	"github.com/felicityin/mpc-tss/tss"
 )
 
@@ -83,14 +82,6 @@ func (round *round1) Start() *tss.Error {
 	}
 	round.temp.prmProof = prmProof
 
-	// Generate mod proof
-	modProof, err := modproof.NewProof(contextI, round.save.PaillierPKs[i].N,
-		round.save.PaillierSK.P, round.save.PaillierSK.Q, round.Rand())
-	if err != nil {
-		return round.WrapError(fmt.Errorf("party %d, calc mod proof failed: %s", i, err.Error()))
-	}
-	round.temp.modProof = modProof
-
 	round.temp.u, _ = common.GetRandomBytes(round.Rand(), 32)
 	round.temp.rho, _ = common.GetRandomBytes(round.Rand(), 32)
 	round.temp.srid, _ = common.GetRandomBytes(round.Rand(), 32)
@@ -104,9 +95,6 @@ func (round *round1) Start() *tss.Error {
 		round.save.PedersenPKs[i].S.Bytes(),
 		round.save.PedersenPKs[i].T.Bytes(),
 		prmProof.Salt,
-		modProof.A.Bytes(),
-		modProof.B.Bytes(),
-		modProof.W.Bytes(),
 		round.temp.rho,
 		round.temp.u,
 	)

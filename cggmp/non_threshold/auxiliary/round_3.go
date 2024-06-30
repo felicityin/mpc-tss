@@ -11,9 +11,8 @@ import (
 	"github.com/felicityin/mpc-tss/crypto/alice/utils"
 	paillierzkproof "github.com/felicityin/mpc-tss/crypto/alice/zkproof/paillier"
 	"github.com/felicityin/mpc-tss/crypto/facproof"
+	"github.com/felicityin/mpc-tss/crypto/modproof"
 	"github.com/felicityin/mpc-tss/tss"
-
-	"github.com/golang/protobuf/proto"
 )
 
 func (round *round3) Start() *tss.Error {
@@ -57,17 +56,6 @@ func (round *round3) Start() *tss.Error {
 			return round.WrapError(fmt.Errorf("[j: %d] verify prm proof failed: %s", j, err.Error()))
 		}
 
-		// Verify mod proof
-		modProof, err := r2Msg.UnmarshalModProof()
-		if err != nil {
-			common.Logger.Errorf("[j: %d] unmarshal mod proof failed: %s", j, err.Error())
-			return round.WrapError(fmt.Errorf("[j: %d] unmarshal mod proof failed: %s", j, err.Error()))
-		}
-		if ok := modProof.Verify(contextJ, round.save.PaillierPKs[j].N); !ok {
-			common.Logger.Errorf("[j: %d] mod proof verify failed", j)
-			return round.WrapError(fmt.Errorf("[j: %d] mod proof verify failed", j))
-		}
-
 		common.Logger.Debugf("party: %d, round_3, calc V", i)
 		hash := common.SHA512_256(
 			round.temp.ssid,
@@ -77,9 +65,6 @@ func (round *round3) Start() *tss.Error {
 			round.save.PedersenPKs[j].S.Bytes(),
 			round.save.PedersenPKs[j].T.Bytes(),
 			prmProof.Salt,
-			modProof.A.Bytes(),
-			modProof.B.Bytes(),
-			modProof.W.Bytes(),
 			r2Msg.GetRho(),
 			r2Msg.GetU(),
 		)
@@ -95,12 +80,21 @@ func (round *round3) Start() *tss.Error {
 		round.temp.rho = utils.Xor(round.temp.rho, r2Msg.GetRho())
 	}
 
-	// P2P send fac proof
+	// Generate mod proof
+	modProof, err := modproof.NewPaillierBlumMessage(
+		round.temp.rho, round.save.PaillierSK.P, round.save.PaillierSK.Q, round.save.PedersenPKs[i].GetN(), paillierzkproof.MINIMALCHALLENGE,
+	)
+	if err != nil {
+		return round.WrapError(fmt.Errorf("party %d, calc mod proof failed: %s", i, err.Error()))
+	}
+
+	// P2P send proofs
 	for j, Pj := range round.Parties().IDs() {
 		if j == i {
 			round.ok[j] = true
 			continue
 		}
+
 		facProof, err := facproof.NewNoSmallFactorMessage(
 			ProofParameter,
 			round.temp.ssid,
@@ -113,13 +107,12 @@ func (round *round3) Start() *tss.Error {
 		if err != nil {
 			return round.WrapError(fmt.Errorf("[j: %d] calc fac proof failed: %s", j, err.Error()))
 		}
-		facProofBytes, err := proto.Marshal(facProof)
-		if err != nil {
-			return round.WrapError(fmt.Errorf("[j: %d] marshal fac proof error: %s", j, err.Error()))
-		}
 
 		common.Logger.Debugf("P[%d]: send fac proof to P[%d]", i, j)
-		r3msg := NewAuxRound3Message(Pj, round.PartyID(), facProofBytes)
+		r3msg, err := NewAuxRound3Message(Pj, round.PartyID(), facProof, modProof)
+		if err != nil {
+			return round.WrapError(err, Pj)
+		}
 		round.out <- r3msg
 	}
 	return nil
