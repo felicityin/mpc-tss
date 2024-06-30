@@ -21,20 +21,23 @@ const (
 	// Then the signing and resharing tests will work with the new n, t configuration using the newly written fixture files.
 	TestParticipants = 2
 	TestThreshold    = test.TestParticipants / 2
+	Ecdsa            = 0
+	Eddsa            = 1
 )
 const (
-	testFixtureDirFormat  = "%s/../test/_ecdsa_keygen"
-	testFixtureFileFormat = "keygen_data_%d.json"
+	testFixtureDirFormat       = "%s/../test/_keygen_fixtures"
+	testEcdsaFixtureFileFormat = "ecdsa_keygen_data_%d.json"
+	testEddsaFixtureFileFormat = "eddsa_keygen_data_%d.json"
 )
 
-func LoadKeygenTestFixtures(qty int, optionalStart ...int) ([]LocalPartySaveData, tss.SortedPartyIDs, error) {
+func LoadKeygenTestFixtures(kind, qty int, optionalStart ...int) ([]LocalPartySaveData, tss.SortedPartyIDs, error) {
 	keys := make([]LocalPartySaveData, 0, qty)
 	start := 0
 	if 0 < len(optionalStart) {
 		start = optionalStart[0]
 	}
 	for i := start; i < qty; i++ {
-		fixtureFilePath := makeTestFixtureFilePath(i)
+		fixtureFilePath := makeTestFixtureFilePath(kind, i)
 		common.Logger.Debugf("path: %s", fixtureFilePath)
 		bz, err := ioutil.ReadFile(fixtureFilePath)
 		if err != nil {
@@ -63,7 +66,7 @@ func LoadKeygenTestFixtures(qty int, optionalStart ...int) ([]LocalPartySaveData
 	return keys, sortedPIDs, nil
 }
 
-func LoadKeygenTestFixturesRandomSet(qty, fixtureCount int) ([]LocalPartySaveData, tss.SortedPartyIDs, error) {
+func LoadKeygenTestFixturesRandomSet(kind, qty, fixtureCount int) ([]LocalPartySaveData, tss.SortedPartyIDs, error) {
 	keys := make([]LocalPartySaveData, 0, qty)
 	plucked := make(map[int]interface{}, qty)
 	for i := 0; len(plucked) < qty; i = (i + 1) % fixtureCount {
@@ -73,7 +76,7 @@ func LoadKeygenTestFixturesRandomSet(qty, fixtureCount int) ([]LocalPartySaveDat
 		}
 	}
 	for i := range plucked {
-		fixtureFilePath := makeTestFixtureFilePath(i)
+		fixtureFilePath := makeTestFixtureFilePath(kind, i)
 		bz, err := ioutil.ReadFile(fixtureFilePath)
 		if err != nil {
 			return nil, nil, errors.Wrapf(err,
@@ -107,9 +110,12 @@ func LoadKeygenTestFixturesRandomSet(qty, fixtureCount int) ([]LocalPartySaveDat
 	return keys, sortedPIDs, nil
 }
 
-func makeTestFixtureFilePath(partyIndex int) string {
+func makeTestFixtureFilePath(kind int, partyIndex int) string {
 	_, callerFileName, _, _ := runtime.Caller(0)
 	srcDirName := filepath.Dir(callerFileName)
 	fixtureDirName := fmt.Sprintf(testFixtureDirFormat, srcDirName)
-	return fmt.Sprintf("%s/"+testFixtureFileFormat, fixtureDirName, partyIndex)
+	if kind == Ecdsa {
+		return fmt.Sprintf("%s/"+testEcdsaFixtureFileFormat, fixtureDirName, partyIndex)
+	}
+	return fmt.Sprintf("%s/"+testEddsaFixtureFileFormat, fixtureDirName, partyIndex)
 }

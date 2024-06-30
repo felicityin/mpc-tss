@@ -4,6 +4,7 @@ package keygen
 
 import (
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/json"
 	"math/big"
@@ -15,6 +16,7 @@ import (
 	"github.com/ipfs/go-log"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/decred/dcrd/dcrec/edwards/v2"
 	"github.com/felicityin/mpc-tss/cggmp/non_threshold/test"
 	"github.com/felicityin/mpc-tss/common"
 	"github.com/felicityin/mpc-tss/crypto"
@@ -23,8 +25,8 @@ import (
 )
 
 const (
-	testParticipants = 5
-	testThreshold    = 3
+	testParticipants = 3
+	testThreshold    = 2
 )
 
 func setUp(level string) {
@@ -33,11 +35,19 @@ func setUp(level string) {
 	}
 }
 
-func TestE2EConcurrentAndSaveFixturesEcdsa(t *testing.T) {
+func TestEcdsaE2EConcurrentAndSaveFixtures(t *testing.T) {
+	testE2EConcurrentAndSaveFixtures(t, Ecdsa)
+}
+
+func TestEddsaE2EConcurrentAndSaveFixtures(t *testing.T) {
+	testE2EConcurrentAndSaveFixtures(t, Eddsa)
+}
+
+func testE2EConcurrentAndSaveFixtures(t *testing.T, kind int) {
 	setUp("debug")
 
 	threshold := testThreshold
-	fixtures, pIDs, err := LoadKeygenTestFixtures(testParticipants)
+	_, pIDs, err := LoadKeygenTestFixtures(kind, testParticipants)
 	if err != nil {
 		common.Logger.Info("No test fixtures were found, so the safe primes will be generated from scratch. This may take a while...")
 		pIDs = tss.GenerateTestPartyIDs(testParticipants)
@@ -56,13 +66,13 @@ func TestE2EConcurrentAndSaveFixturesEcdsa(t *testing.T) {
 
 	// init the parties
 	for i := 0; i < len(pIDs); i++ {
-		var P *LocalParty
-		params := tss.NewParameters(tss.S256(), p2pCtx, pIDs[i], len(pIDs), threshold)
-		if i < len(fixtures) {
-			P = NewLocalParty(params, outCh, endCh).(*LocalParty)
+		var params *tss.Parameters
+		if kind == Ecdsa {
+			params = tss.NewParameters(tss.S256(), p2pCtx, pIDs[i], len(pIDs), threshold)
 		} else {
-			P = NewLocalParty(params, outCh, endCh).(*LocalParty)
+			params = tss.NewParameters(tss.Edwards(), p2pCtx, pIDs[i], len(pIDs), threshold)
 		}
+		P := NewLocalParty(params, outCh, endCh).(*LocalParty)
 		parties = append(parties, P)
 		go func(P *LocalParty) {
 			if err := P.Start(); err != nil {
@@ -125,97 +135,15 @@ keygen:
 			// .. here comes a workaround to recover this party's index (it was removed from save data)
 			index, err := save.OriginalIndex()
 			assert.NoErrorf(t, err, "should not be an error getting a party's index from save data")
-			tryWriteTestFixtureFile(t, index, *save)
+			tryWriteTestFixtureFile(t, kind, index, *save)
 
 			atomic.AddInt32(&ended, 1)
 			if atomic.LoadInt32(&ended) == int32(len(pIDs)) {
 				t.Logf("Done. Received save data from %d participants", ended)
 
-				// combine shares for each Pj to get u
-				u := big.NewInt(0)
-				for j, Pj := range parties {
-					pShares := make(vss.Shares, 0)
-					for _, P := range parties {
-						vssMsgs := P.temp.kgRound2Message2s
-						share := vssMsgs[j].Content().(*TKgRound2Message2).Share
-						shareStruct := &vss.Share{
-							Threshold: threshold,
-							ID:        P.PartyID().KeyInt(),
-							Share:     new(big.Int).SetBytes(share),
-						}
-						pShares = append(pShares, shareStruct)
-					}
-					uj, err := pShares[:threshold+1].ReConstruct(tss.S256())
-					assert.NoError(t, err, "vss.ReConstruct should not throw error")
+				verifyKeygen(t, kind, threshold, parties, save)
 
-					// uG test: u*G[j] == V[0]
-					assert.Equal(t, uj, Pj.temp.s0)
-					uG := crypto.ScalarBaseMult(tss.EC(), uj)
-					assert.True(t, uG.Equals(Pj.temp.vs[0]), "ensure u*G[j] == V_0")
-
-					// xj tests: BigXj == xj*G
-					xj := Pj.data.PrivXi
-					gXj := crypto.ScalarBaseMult(tss.EC(), xj)
-					BigXj := Pj.data.PubXj[j]
-					assert.True(t, BigXj.Equals(gXj), "ensure BigX_j == g^x_j")
-
-					// fails if threshold cannot be satisfied (bad share)
-					{
-						badShares := pShares[:threshold]
-						badShares[len(badShares)-1].Share.Set(big.NewInt(0))
-						uj, err := pShares[:threshold].ReConstruct(tss.S256())
-						assert.NoError(t, err)
-						assert.NotEqual(t, parties[j].temp.s0, uj)
-						BigXjX, BigXjY := tss.EC().ScalarBaseMult(uj.Bytes())
-						assert.NotEqual(t, BigXjX, Pj.temp.vs[0].X())
-						assert.NotEqual(t, BigXjY, Pj.temp.vs[0].Y())
-					}
-					u = new(big.Int).Add(u, uj)
-
-					// make sure everyone has the same chain code
-					assert.Equal(t, parties[0].data.ChainCode, Pj.data.ChainCode)
-				}
-
-				// build key pair
-				pkX, pkY := save.Pubkey.X(), save.Pubkey.Y()
-				pk := ecdsa.PublicKey{
-					Curve: tss.EC(),
-					X:     pkX,
-					Y:     pkY,
-				}
-				sk := ecdsa.PrivateKey{
-					PublicKey: pk,
-					D:         u,
-				}
-
-				// test pub key, should be on curve and match pkX, pkY
-				assert.True(t, pk.IsOnCurve(pkX, pkY), "public key must be on curve")
-
-				// public key tests
-				assert.NotZero(t, u, "u should not be zero")
-				ourPkX, ourPkY := tss.EC().ScalarBaseMult(u.Bytes())
-				assert.Equal(t, pkX, ourPkX, "pkX should match expected pk derived from u")
-				assert.Equal(t, pkY, ourPkY, "pkY should match expected pk derived from u")
-				t.Log("Public key tests done.")
-
-				// make sure everyone has the same public key
-				for _, Pj := range parties {
-					assert.Equal(t, pkX, Pj.data.Pubkey.X())
-					assert.Equal(t, pkY, Pj.data.Pubkey.Y())
-				}
-				t.Log("Public key distribution test done.")
-
-				// test sign/verify
-				data := make([]byte, 32)
-				for i := range data {
-					data[i] = byte(i)
-				}
-				r, s, err := ecdsa.Sign(rand.Reader, &sk, data)
-				assert.NoError(t, err, "sign should not throw an error")
-				ok := ecdsa.Verify(&pk, data, r, s)
-				assert.True(t, ok, "signature should be ok")
 				t.Log("ECDSA signing test done.")
-
 				t.Logf("Start goroutines: %d, End goroutines: %d", startGR, runtime.NumGoroutine())
 
 				break keygen
@@ -224,8 +152,139 @@ keygen:
 	}
 }
 
-func tryWriteTestFixtureFile(t *testing.T, index int, data LocalPartySaveData) {
-	fixtureFileName := makeTestFixtureFilePath(index)
+func verifyKeygen(t *testing.T, kind, threshold int, parties []*LocalParty, save *LocalPartySaveData) {
+	var ec elliptic.Curve
+	if kind == Ecdsa {
+		ec = tss.S256()
+	} else {
+		ec = tss.Edwards()
+	}
+
+	// combine shares for each Pj to get u
+	u := big.NewInt(0)
+	for j, Pj := range parties {
+		pShares := make(vss.Shares, 0)
+		for _, P := range parties {
+			vssMsgs := P.temp.kgRound2Message2s
+			share := vssMsgs[j].Content().(*TKgRound2Message2).Share
+			shareStruct := &vss.Share{
+				Threshold: threshold,
+				ID:        P.PartyID().KeyInt(),
+				Share:     new(big.Int).SetBytes(share),
+			}
+			pShares = append(pShares, shareStruct)
+		}
+		uj, err := pShares[:threshold+1].ReConstruct(ec)
+		assert.NoError(t, err, "vss.ReConstruct should not throw error")
+
+		// uG test: u*G[j] == V[0]
+		assert.Equal(t, uj, Pj.temp.s0)
+		uG := crypto.ScalarBaseMult(ec, uj)
+		assert.True(t, uG.Equals(Pj.temp.vs[0]), "ensure u*G[j] == V_0")
+
+		// xj tests: BigXj == xj*G
+		xj := Pj.data.PrivXi
+		gXj := crypto.ScalarBaseMult(ec, xj)
+		BigXj := Pj.data.PubXj[j]
+		assert.True(t, BigXj.Equals(gXj), "ensure BigX_j == g^x_j")
+
+		// fails if threshold cannot be satisfied (bad share)
+		{
+			badShares := pShares[:threshold]
+			badShares[len(badShares)-1].Share.Set(big.NewInt(0))
+			uj, err := pShares[:threshold].ReConstruct(ec)
+			assert.NoError(t, err)
+			assert.NotEqual(t, parties[j].temp.s0, uj)
+			BigXjX, BigXjY := ec.ScalarBaseMult(uj.Bytes())
+			assert.NotEqual(t, BigXjX, Pj.temp.vs[0].X())
+			assert.NotEqual(t, BigXjY, Pj.temp.vs[0].Y())
+		}
+		u = new(big.Int).Add(u, uj)
+		u.Mod(u, ec.Params().N)
+
+		// make sure everyone has the same chain code
+		assert.Equal(t, parties[0].data.ChainCode, Pj.data.ChainCode)
+	}
+
+	pkX, pkY := save.Pubkey.X(), save.Pubkey.Y()
+
+	// public key tests
+	assert.NotZero(t, u, "u should not be zero")
+	ourPkX, ourPkY := ec.ScalarBaseMult(u.Bytes())
+	assert.Equal(t, pkX, ourPkX, "pkX should match expected pk derived from u")
+	assert.Equal(t, pkY, ourPkY, "pkY should match expected pk derived from u")
+	t.Log("Public key tests done.")
+
+	// make sure everyone has the same public key
+	for _, Pj := range parties {
+		assert.Equal(t, pkX, Pj.data.Pubkey.X())
+		assert.Equal(t, pkY, Pj.data.Pubkey.Y())
+	}
+	t.Log("Public key distribution test done.")
+
+	if kind == Ecdsa {
+		verifyEcdsa(t, save, u)
+	} else {
+		verifyEddsa(t, save, u)
+	}
+}
+
+func verifyEcdsa(t *testing.T, save *LocalPartySaveData, u *big.Int) {
+	// build key pair
+	pkX, pkY := save.Pubkey.X(), save.Pubkey.Y()
+	pk := ecdsa.PublicKey{
+		Curve: tss.EC(),
+		X:     pkX,
+		Y:     pkY,
+	}
+	sk := ecdsa.PrivateKey{
+		PublicKey: pk,
+		D:         u,
+	}
+
+	// test pub key, should be on curve and match pkX, pkY
+	assert.True(t, pk.IsOnCurve(pkX, pkY), "public key must be on curve")
+
+	// test sign/verify
+	data := make([]byte, 32)
+	for i := range data {
+		data[i] = byte(i)
+	}
+	r, s, err := ecdsa.Sign(rand.Reader, &sk, data)
+	assert.NoError(t, err, "sign should not throw an error")
+	ok := ecdsa.Verify(&pk, data, r, s)
+	assert.True(t, ok, "signature should be ok")
+}
+
+func verifyEddsa(t *testing.T, save *LocalPartySaveData, u *big.Int) {
+	pkX, pkY := save.Pubkey.X(), save.Pubkey.Y()
+	pk := edwards.PublicKey{
+		Curve: tss.Edwards(),
+		X:     pkX,
+		Y:     pkY,
+	}
+	sk, _, err := edwards.PrivKeyFromScalar(common.PadToLengthBytesInPlace(u.Bytes(), 32))
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	// test pub key, should be on curve and match pkX, pkY
+	assert.True(t, pk.IsOnCurve(pkX, pkY), "public key must be on curve")
+
+	// test sign/verify
+	data := make([]byte, 32)
+	for i := range data {
+		data[i] = byte(i)
+	}
+	r, s, err := edwards.Sign(sk, data)
+	assert.NoError(t, err, "sign should not throw an error")
+	ok := edwards.Verify(&pk, data, r, s)
+	assert.True(t, ok, "signature should be ok")
+	t.Log("EDDSA signing test done.")
+}
+
+func tryWriteTestFixtureFile(t *testing.T, kind, index int, data LocalPartySaveData) {
+	fixtureFileName := makeTestFixtureFilePath(kind, index)
 
 	// fixture file does not already exist?
 	// if it does, we won't re-create it here
