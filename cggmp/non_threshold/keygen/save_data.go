@@ -11,7 +11,6 @@ import (
 type (
 	LocalKeygenSecrets struct {
 		PrivXi, ShareID *big.Int // xi, kj
-		ChainCodes      []*big.Int
 	}
 
 	// Everything in LocalPartySaveData is saved locally to user's HD when done
