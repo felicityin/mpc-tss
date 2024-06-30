@@ -60,8 +60,8 @@ func (round *round3) Start() *tss.Error {
 		// Verify mod proof
 		modProof, err := r2Msg.UnmarshalModProof()
 		if err != nil {
-			common.Logger.Errorf("[j: %d] unmarshal mod proof failed", j)
-			return round.WrapError(fmt.Errorf("[j: %d] unmarshal mod proof failed", j))
+			common.Logger.Errorf("[j: %d] unmarshal mod proof failed: %s", j, err.Error())
+			return round.WrapError(fmt.Errorf("[j: %d] unmarshal mod proof failed: %s", j, err.Error()))
 		}
 		if ok := modProof.Verify(contextJ, round.save.PaillierPKs[j].N); !ok {
 			common.Logger.Errorf("[j: %d] mod proof verify failed", j)

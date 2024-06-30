@@ -1,7 +1,6 @@
 package auxiliary
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"math/big"
@@ -53,13 +52,9 @@ func (round *round1) Start() *tss.Error {
 	round.temp.ssid = ssid
 
 	if round.save.PaillierSK == nil {
-		{
-			ctx, cancel := context.WithTimeout(context.Background(), round.SafePrimeGenTimeout())
-			defer cancel()
-			round.save.PaillierSK, err = GeneratePreParamsWithContextAndRandom(ctx, round.Rand(), round.Concurrency())
-			if err != nil {
-				return round.WrapError(errors.New("paillier sk generation failed"), Pi)
-			}
+		round.save.PaillierSK, err = GeneratePaillier(round.Rand())
+		if err != nil {
+			return round.WrapError(errors.New("paillier sk generation failed"), Pi)
 		}
 	}
 	round.save.PaillierPKs[i] = &round.save.PaillierSK.PublicKey
