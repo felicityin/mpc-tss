@@ -7,6 +7,7 @@ import (
 
 	"github.com/felicityin/mpc-tss/common"
 	paillierzkproof "github.com/felicityin/mpc-tss/crypto/alice/zkproof/paillier"
+	"github.com/felicityin/mpc-tss/crypto/paillier"
 	"github.com/felicityin/mpc-tss/tss"
 )
 
@@ -76,6 +77,14 @@ func NewLocalParty(
 	// temp data init
 	p.temp.V = make([][]byte, partyCount)
 	return p
+}
+
+func (p *LocalParty) PaillierSK() *paillier.PrivateKey {
+	return p.data.PaillierSK
+}
+
+func (p *LocalParty) SetPaillierSK(sk *paillier.PrivateKey) {
+	p.data.PaillierSK = sk
 }
 
 func (p *LocalParty) FirstRound() tss.Round {

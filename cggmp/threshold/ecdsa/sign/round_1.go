@@ -2,20 +2,18 @@ package sign
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/felicityin/mpc-tss/cggmp/non_threshold/auxiliary"
-	"github.com/felicityin/mpc-tss/cggmp/non_threshold/keygen"
+	"github.com/felicityin/mpc-tss/cggmp/threshold/keygen"
 	"github.com/felicityin/mpc-tss/common"
 	"github.com/felicityin/mpc-tss/crypto"
 	"github.com/felicityin/mpc-tss/crypto/encproof"
 	"github.com/felicityin/mpc-tss/tss"
-
-	edwards "github.com/decred/dcrd/dcrec/edwards/v2"
-	"google.golang.org/protobuf/proto"
 )
 
-var ProofParameter = crypto.NewProofConfig(edwards.Edwards().N)
+var ProofParameter = crypto.NewProofConfig(tss.S256().Params().N)
 
 // round 1 represents round 1 of the signing part of the EDDSA TSS spec
 func newRound1(
@@ -52,12 +50,13 @@ func (round *round1) Start() *tss.Error {
 		return round.WrapError(err)
 	}
 
-	// k in F_q
-	round.temp.k = common.GetRandomPositiveInt(round.Rand(), round.Params().EC().Params().N)
-	common.Logger.Debugf("P[%d]: calc ki", i)
+	// k, gamma in F_q
+	round.temp.k = common.GetRandomPositiveInt(round.Rand(), round.EC().Params().N)
+	round.temp.gamma = common.GetRandomPositiveInt(round.Rand(), round.EC().Params().N)
+	common.Logger.Debugf("P[%d]: calc ki, gammai", i)
 
-	// Ki = enc(k, ρ)
-	kCiphertext, rho, err := round.aux.PaillierPKs[i].EncryptAndReturnRandomness(
+	// Ki = enc(k, ρ), Gammai = enc(gamma, mu)
+	round.temp.kCiphertexts[i], round.temp.rho, err = round.aux.PaillierPKs[i].EncryptAndReturnRandomness(
 		round.Rand(),
 		round.temp.k,
 	)
@@ -65,17 +64,21 @@ func (round *round1) Start() *tss.Error {
 		common.Logger.Errorf("P[%d]: create enc proof failed: %s", i, err)
 		return round.WrapError(err)
 	}
-	round.temp.rho = rho
-	round.temp.kCiphertexts[i] = kCiphertext
-	common.Logger.Debugf("P[%d]: calc kCiphertext", i)
+	round.temp.gammaCiphertexts[i], round.temp.mu, err = round.aux.PaillierPKs[i].EncryptAndReturnRandomness(
+		round.Rand(),
+		round.temp.gamma,
+	)
+	if err != nil {
+		common.Logger.Errorf("P[%d]: create enc proof failed: %s", i, err)
+		return round.WrapError(err)
+	}
+	common.Logger.Debugf("P[%d]: calc kCiphertext, gammaCiphertext done", i)
 
-	// broadcast Ki
+	// broadcast Ki, Gammai
 	common.Logger.Debugf("P[%d]: broadcast Ki", i)
-	r1msg1 := NewSignRound1Message1(round.PartyID(), kCiphertext)
+	r1msg1 := NewSignRound1Message1(round.PartyID(), round.temp.kCiphertexts[i], round.temp.gammaCiphertexts[i])
 	round.temp.signRound1Message1s[i] = r1msg1
 	round.out <- r1msg1
-
-	contextI := append(round.temp.ssid, big.NewInt(int64(i)).Bytes()...)
 
 	// p2p send enc proof to Pj
 	for j, Pj := range round.Parties().IDs() {
@@ -83,8 +86,11 @@ func (round *round1) Start() *tss.Error {
 			round.ok[j] = true
 			continue
 		}
+		contextJ := append(round.temp.ssid, big.NewInt(int64(j)).Bytes()...)
+
 		// M(prove, Πenc, (sid,i), (Iε,Ki); (ki,rhoi))
-		encProof, err := encproof.NewEncryptRangeMessage(ProofParameter, contextI, kCiphertext,
+		encProof, err := encproof.NewEncryptRangeMessage(
+			ProofParameter, contextJ, round.temp.kCiphertexts[i],
 			round.aux.PaillierPKs[i].N, round.temp.k, round.temp.rho, round.aux.PedersenPKs[j],
 		)
 		if err != nil {
@@ -93,14 +99,11 @@ func (round *round1) Start() *tss.Error {
 		}
 		common.Logger.Debugf("P[%d]: calc enc proof", i)
 
-		encProofBytes, err := proto.Marshal(encProof)
-		if err != nil {
-			common.Logger.Errorf("marshal enc proof failed: %s, party: %d", err, j)
-			return round.WrapError(errors.New("marshal enc proof failed"))
-		}
-
 		common.Logger.Debugf("P[%d]: p2p send enc proof", i)
-		r1msg2 := NewSignRound1Message2(Pj, round.PartyID(), encProofBytes)
+		r1msg2, err := NewSignRound1Message2(Pj, round.PartyID(), encProof)
+		if err != nil {
+			round.WrapError(err, Pj)
+		}
 		round.out <- r1msg2
 	}
 
@@ -140,4 +143,37 @@ func (round *round1) CanAccept(msg tss.ParsedMessage) bool {
 func (round *round1) NextRound() tss.Round {
 	round.started = false
 	return &round2{round}
+}
+
+// helper to call into PrepareForSigning()
+func (round *round1) prepare() error {
+	i := round.PartyID().Index
+
+	privXi := round.key.PrivXi
+	ks := round.key.Ks
+	pubXjs := round.key.PubXj
+
+	if round.Threshold()+1 > len(ks) {
+		return fmt.Errorf("t+1=%d is not satisfied by the key count of %d", round.Threshold()+1, len(ks))
+	}
+	wi, bigWs := PrepareForSigning(round.Params().EC(), i, len(ks), privXi, ks, pubXjs)
+
+	round.temp.wi = wi
+	round.temp.bigWs = bigWs
+
+	pubKey := bigWs[0]
+	var err error
+	for j, pubx := range bigWs {
+		if j == 0 {
+			continue
+		}
+		pubKey, err = pubKey.Add(pubx)
+		if err != nil {
+			common.Logger.Errorf("calc pubkey failed, party: %d", j)
+			return round.WrapError(err)
+		}
+	}
+	round.temp.pubW = pubKey
+
+	return nil
 }

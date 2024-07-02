@@ -11,6 +11,7 @@ import (
 	"github.com/ipfs/go-log"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/felicityin/mpc-tss/cggmp/non_threshold/auxiliary"
 	"github.com/felicityin/mpc-tss/cggmp/non_threshold/keygen"
 	"github.com/felicityin/mpc-tss/cggmp/non_threshold/test"
 	"github.com/felicityin/mpc-tss/common"
@@ -68,11 +69,11 @@ func testEcdsaE2EConcurrentAndSaveFixtures(t *testing.T, kind int, sk *paillier.
 	}
 
 	p2pCtx := tss.NewPeerContext(pIDs)
-	parties := make([]*LocalParty, 0, len(pIDs))
+	parties := make([]*auxiliary.LocalParty, 0, len(pIDs))
 
 	errCh := make(chan *tss.Error, len(pIDs))
 	outCh := make(chan tss.Message, len(pIDs))
-	endCh := make(chan *LocalPartySaveData, len(pIDs))
+	endCh := make(chan *auxiliary.LocalPartySaveData, len(pIDs))
 
 	updater := test.SharedPartyUpdater
 
@@ -81,10 +82,10 @@ func testEcdsaE2EConcurrentAndSaveFixtures(t *testing.T, kind int, sk *paillier.
 	// init the parties
 	for i := 0; i < len(pIDs); i++ {
 		params := tss.NewParameters(nil, p2pCtx, pIDs[i], len(pIDs), threshold)
-		P := NewLocalParty(params, outCh, endCh).(*LocalParty)
+		P := auxiliary.NewLocalParty(params, outCh, endCh).(*auxiliary.LocalParty)
 		P.SetPaillierSK(sk)
 		parties = append(parties, P)
-		go func(P *LocalParty) {
+		go func(P *auxiliary.LocalParty) {
 			if err := P.Start(); err != nil {
 				errCh <- err
 			}
@@ -105,11 +106,11 @@ AUX:
 			bz, _, _ := msg.WireBytes()
 			pMsg, _ := tss.ParseWireMessage(bz, msg.GetFrom(), msg.IsBroadcast())
 			switch pMsg.Content().(type) {
-			case *AuxRound1Message:
+			case *auxiliary.AuxRound1Message:
 				common.Logger.Debugf("AuxRound1Message")
-			case *AuxRound2Message:
+			case *auxiliary.AuxRound2Message:
 				common.Logger.Debugf("AuxRound2Message")
-			case *AuxRound3Message:
+			case *auxiliary.AuxRound3Message:
 				common.Logger.Debugf("AuxRound3Message")
 			}
 
@@ -155,7 +156,7 @@ AUX:
 	}
 }
 
-func tryWriteTestFixtureFile(t *testing.T, kind, index int, data LocalPartySaveData) {
+func tryWriteTestFixtureFile(t *testing.T, kind, index int, data auxiliary.LocalPartySaveData) {
 	fixtureFileName := makeTestFixtureFilePath(kind, index)
 
 	// fixture file does not already exist?

@@ -13,10 +13,10 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/decred/dcrd/dcrec/edwards/v2"
 	"github.com/ipfs/go-log"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/decred/dcrd/dcrec/edwards/v2"
 	"github.com/felicityin/mpc-tss/cggmp/non_threshold/test"
 	"github.com/felicityin/mpc-tss/common"
 	"github.com/felicityin/mpc-tss/crypto"
