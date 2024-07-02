@@ -145,7 +145,6 @@ SIGN:
 				assert.True(t, ok, "ecdsa verify must pass")
 				t.Log("ECDSA signing test done.")
 				// END ECDSA verify
-
 				break SIGN
 			}
 		}
