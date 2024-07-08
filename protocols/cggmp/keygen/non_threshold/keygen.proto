@@ -1,0 +1,34 @@
+syntax = "proto3";
+package tsslib.non_threshold.keygen;
+option go_package = "non_threshold/keygen";
+
+// protoc --go_out=. keygen.proto
+
+/*
+ * Represents a BROADCAST message sent during Round 1 of the EDDSA TSS keygen protocol.
+ */
+message KGRound1Message {
+    bytes commitment = 1;
+}
+
+/*
+ * Represents a BROADCAST message sent to each party during Round 2 of the EDDSA TSS keygen protocol.
+ */
+message KGRound2Message {
+    bytes ssid = 1;
+    int32 party_index = 2;
+    bytes srid = 3;
+    bytes public_x_x = 4;
+    bytes public_x_y = 5;
+    bytes commitment_x = 6;
+    bytes commitment_y = 7;
+    bytes u = 8;
+    bytes chain_code = 9;
+}
+
+/*
+ * Represents a BROADCAST message sent during Round 3 of the EDDSA TSS keygen protocol.
+ */
+ message KGRound3Message {
+    bytes sch_proof = 1;
+}

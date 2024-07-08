@@ -1,0 +1,49 @@
+syntax = "proto3";
+package tsslib.cggmp.sign.ecdsa;
+option go_package = "ecdsa/sign";
+
+/*
+ * Represents a BROADCAST message sent to all parties during Round 1 of the TSS signing protocol.
+ */
+message signRound1Message1 {
+    bytes k_ciphertext = 1;
+    bytes gamma_ciphertext = 2;
+}
+
+/*
+ * Represents a P2P message sent to all parties during Round 1 of the EDDSA TSS signing protocol.
+ */
+ message signRound1Message2 {
+    bytes enc_proof = 1;
+}
+
+/*
+ * Represents a P2P message sent to all parties during Round 2 of the TSS signing protocol.
+ */
+message signRound2Message {
+    bytes ssid = 1;
+    bytes big_gamma = 2;
+    bytes d = 3;
+    bytes f = 4;
+    bytes d_hat = 5;
+    bytes f_hat = 6;
+    bytes affg_proof = 7;
+    bytes affg_hat_proof = 8;
+    bytes log_proof = 9;
+}
+
+/*
+ * Represents a P2P message sent to all parties during Round 3 of the TSS signing protocol.
+ */
+message signRound3Message {
+    bytes delta = 1;
+    bytes big_delta = 2;
+    bytes log_proof = 3;
+}
+
+/*
+ * Represents a BROADCAST message sent to all parties during Round 4 of the TSS signing protocol.
+ */
+ message SignRound4Message {
+    bytes sigma = 1;
+}

@@ -1,0 +1,34 @@
+syntax = "proto3";
+package tsslib.cggmp.auxiliary;
+option go_package = "cggmp/auxiliary";
+
+// protoc --go_out=. auxiliary.proto
+
+/*
+ * Represents a BROADCAST message sent during Round 1 of the EDDSA TSS keygen protocol.
+ */
+message AuxRound1Message {
+    bytes hash = 1;
+}
+
+/*
+ * Represents a BROADCAST message sent to each party during Round 2 of the EDDSA TSS keygen protocol.
+ */
+message AuxRound2Message {
+    bytes ssid = 1;
+    bytes srid = 2;
+    bytes paillier_n = 3;
+    bytes pedersen_s = 4;
+    bytes pedersen_t = 5;
+    bytes prm_proof = 6;
+    bytes rho = 7;
+    bytes u = 8;
+}
+
+/*
+ * Represents a P2P message sent during Round 3 of the TSS keygen protocol.
+ */
+ message AuxRound3Message {
+    bytes fac_proof = 1;
+    bytes mod_proof = 2;
+}
