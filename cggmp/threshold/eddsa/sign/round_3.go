@@ -73,7 +73,7 @@ func (round *round3) Start() *tss.Error {
 	// compute lambda
 	var encodedR [32]byte
 	R.ToBytes(&encodedR)
-	encodedPubKey := ecPointToEncodedBytes(round.key.Pubkey.X(), round.key.Pubkey.Y())
+	encodedPubKey := ecPointToEncodedBytes(round.temp.pubW.X(), round.temp.pubW.Y())
 
 	// h = hash512(R || X || M)
 	h := sha512.New()

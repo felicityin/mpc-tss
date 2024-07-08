@@ -4,15 +4,15 @@ import (
 	"errors"
 	"math/big"
 
+	edwards "github.com/decred/dcrd/dcrec/edwards/v2"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/felicityin/mpc-tss/cggmp/non_threshold/auxiliary"
 	"github.com/felicityin/mpc-tss/cggmp/non_threshold/keygen"
 	"github.com/felicityin/mpc-tss/common"
 	"github.com/felicityin/mpc-tss/crypto"
 	"github.com/felicityin/mpc-tss/crypto/encproof"
 	"github.com/felicityin/mpc-tss/tss"
-
-	edwards "github.com/decred/dcrd/dcrec/edwards/v2"
-	"google.golang.org/protobuf/proto"
 )
 
 var ProofParameter = crypto.NewProofConfig(edwards.Edwards().N)

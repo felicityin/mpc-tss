@@ -1,0 +1,18 @@
+syntax = "proto3";
+package legend.tsslib.frost.non_threshold.sign.eddsa;
+option go_package = "frost/non_threshold/eddsa/sign";
+
+/*
+ * Represents a BROADCAST message sent to all parties during Round 1 of the EDDSA TSS signing protocol.
+ */
+message SignRound1Message {
+    bytes d = 1;
+    bytes e = 2;
+}
+
+/*
+ * Represents a P2P message sent to all parties during Round 2 of the EDDSA TSS signing protocol.
+ */
+message SignRound2Message {
+    bytes si = 1;
+}
