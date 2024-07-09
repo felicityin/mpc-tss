@@ -4,7 +4,7 @@
 // terms governing use, modification, and redistribution, is contained in the
 // file LICENSE at the root of the source code distribution tree.
 
-package presign
+package crypto
 
 import (
 	"crypto/elliptic"
@@ -12,7 +12,6 @@ import (
 	"math/big"
 
 	"github.com/felicityin/mpc-tss/common"
-	"github.com/felicityin/mpc-tss/crypto"
 )
 
 func PrepareForSigning(
@@ -20,17 +19,20 @@ func PrepareForSigning(
 	i, pax int,
 	privXi *big.Int,
 	ks []*big.Int,
-	pubXj []*crypto.ECPoint,
-) (wi *big.Int, bigWs []*crypto.ECPoint) {
+	pubXj []*ECPoint,
+) (wi *big.Int, bigWs []*ECPoint, sumW *ECPoint, err error) {
 	modQ := common.ModInt(ec.Params().N)
 	if len(ks) != len(pubXj) {
-		panic(fmt.Errorf("PrepareForSigning: len(ks) != len(bigXs) (%d != %d)", len(ks), len(pubXj)))
+		err = fmt.Errorf("PrepareForSigning: len(ks) != len(bigXs) (%d != %d)", len(ks), len(pubXj))
+		return
 	}
 	if len(ks) != pax {
-		panic(fmt.Errorf("PrepareForSigning: len(ks) != pax (%d != %d)", len(ks), pax))
+		err = fmt.Errorf("PrepareForSigning: len(ks) != pax (%d != %d)", len(ks), pax)
+		return
 	}
 	if len(ks) <= i {
-		panic(fmt.Errorf("PrepareForSigning: len(ks) <= i (%d <= %d)", len(ks), i))
+		err = fmt.Errorf("PrepareForSigning: len(ks) <= i (%d <= %d)", len(ks), i)
+		return
 	}
 
 	// 2-4.
@@ -43,7 +45,8 @@ func PrepareForSigning(
 		ksi := ks[i]
 		if ksj.Cmp(ksi) == 0 {
 			common.Logger.Errorf("index of two parties are equal: (%d, %d), (%d, %d)", i, j, ksi, ksj)
-			panic(fmt.Errorf("index of two parties are equal"))
+			err = fmt.Errorf("index of two parties are equal")
+			return
 		}
 		// big.Int Div is calculated as: a/b = a * modInv(b,q)
 		coef := modQ.Mul(ks[j], modQ.ModInverse(new(big.Int).Sub(ksj, ksi)))
@@ -51,7 +54,7 @@ func PrepareForSigning(
 	}
 
 	// 5-10.
-	bigWs = make([]*crypto.ECPoint, len(ks))
+	bigWs = make([]*ECPoint, len(ks))
 	for j := 0; j < pax; j++ {
 		bigWj := pubXj[j]
 		for c := 0; c < pax; c++ {
@@ -61,7 +64,8 @@ func PrepareForSigning(
 			ksc := ks[c]
 			ksj := ks[j]
 			if ksj.Cmp(ksc) == 0 {
-				panic(fmt.Errorf("index of two parties are equal"))
+				err = fmt.Errorf("index of two parties are equal")
+				return
 			}
 			// big.Int Div is calculated as: a/b = a * modInv(b,q)
 			iota := modQ.Mul(ksc, modQ.ModInverse(new(big.Int).Sub(ksc, ksj)))
@@ -69,5 +73,17 @@ func PrepareForSigning(
 		}
 		bigWs[j] = bigWj
 	}
-	return
+
+	pubKey := bigWs[0]
+	for j, pubx := range bigWs {
+		if j == 0 {
+			continue
+		}
+		pubKey, err = pubKey.Add(pubx)
+		if err != nil {
+			err = fmt.Errorf("calc pubkey failed, party: %d, %s", j, err.Error())
+			return
+		}
+	}
+	return wi, bigWs, pubKey, nil
 }

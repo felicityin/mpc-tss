@@ -31,7 +31,7 @@ func setUp(level string) {
 	}
 
 	// only for test
-	tss.SetCurve(tss.S256())
+	tss.SetCurve(tss.Edwards())
 }
 
 func TestE2ENonThresholdConcurrent(t *testing.T) {
@@ -40,12 +40,12 @@ func TestE2ENonThresholdConcurrent(t *testing.T) {
 	threshold := testParticipants
 
 	// PHASE: load keygen fixtures
-	keys, signPIDs, err := nonKeygen.LoadKeygenTestFixturesRandomSet(keygen.Ecdsa, threshold, testParticipants)
+	keys, signPIDs, err := nonKeygen.LoadKeygenTestFixturesRandomSet(keygen.Eddsa, threshold, testParticipants)
 	assert.NoError(t, err, "should load keygen fixtures")
 	assert.Equal(t, threshold, len(keys))
 	assert.Equal(t, threshold, len(signPIDs))
 
-	auxs, _, err := auxiliary.LoadAuxTestFixtures(keygen.Ecdsa, threshold)
+	auxs, _, err := auxiliary.LoadAuxTestFixtures(keygen.Eddsa, threshold)
 	assert.NoError(t, err, "should load aux fixtures")
 	assert.Equal(t, threshold, len(auxs))
 
@@ -62,7 +62,7 @@ func TestE2ENonThresholdConcurrent(t *testing.T) {
 
 	// init the parties
 	for i := 0; i < len(signPIDs); i++ {
-		params := tss.NewParameters(tss.S256(), p2pCtx, signPIDs[i], len(signPIDs), threshold)
+		params := tss.NewParameters(tss.Edwards(), p2pCtx, signPIDs[i], len(signPIDs), threshold)
 
 		P := NewLocalParty(false, params, keys[i], auxs[i], outCh, endCh).(*LocalParty)
 		parties = append(parties, P)
@@ -108,8 +108,7 @@ SIGN:
 			atomic.AddInt32(&ended, 1)
 			if atomic.LoadInt32(&ended) == int32(len(signPIDs)) {
 				t.Logf("Done. Received signature data from %d participants", ended)
-				t.Log("ECDSA signing test done.")
-				// END ECDSA verify
+				t.Log("EDDSA signing test done.")
 				break SIGN
 			}
 		}
@@ -117,15 +116,14 @@ SIGN:
 }
 
 func TestE2EThresholdConcurrent(t *testing.T) {
-	setUp("debug")
+	setUp("info")
 
 	threshold := testThreshold
 
 	// PHASE: load keygen fixtures
-	keys, signPIDs, err := tKeygen.LoadKeygenTestFixturesRandomSet(keygen.Ecdsa, testThreshold+1, testParticipants)
+	keys, signPIDs, err := tKeygen.LoadKeygenTestFixturesRandomSet(keygen.Eddsa, threshold+1, testParticipants)
 	assert.NoError(t, err, "should load keygen fixtures")
-
-	auxs, _, err := auxiliary.LoadAuxTestFixtures(keygen.Ecdsa, testThreshold+1)
+	auxs, _, err := auxiliary.LoadAuxTestFixtures(testThreshold+1, testParticipants)
 	assert.NoError(t, err, "should load aux fixtures")
 
 	// PHASE: signing
@@ -141,7 +139,7 @@ func TestE2EThresholdConcurrent(t *testing.T) {
 
 	// init the parties
 	for i := 0; i < len(signPIDs); i++ {
-		params := tss.NewParameters(tss.S256(), p2pCtx, signPIDs[i], len(signPIDs), threshold)
+		params := tss.NewParameters(tss.Edwards(), p2pCtx, signPIDs[i], len(signPIDs), threshold)
 		P := NewLocalParty(true, params, keys[i], auxs[i], outCh, endCh).(*LocalParty)
 		parties = append(parties, P)
 		go func(P *LocalParty) {
@@ -152,13 +150,13 @@ func TestE2EThresholdConcurrent(t *testing.T) {
 	}
 
 	var ended int32
-SIGN:
+signing:
 	for {
 		select {
 		case err := <-errCh:
 			common.Logger.Errorf("Error: %s", err)
 			assert.FailNow(t, err.Error())
-			break SIGN
+			break signing
 
 		case msg := <-outCh:
 			dest := msg.GetTo()
@@ -185,9 +183,9 @@ SIGN:
 
 			atomic.AddInt32(&ended, 1)
 			if atomic.LoadInt32(&ended) == int32(len(signPIDs)) {
-				t.Log("ECDSA signing test done.")
-				// END ECDSA verify
-				break SIGN
+				t.Logf("Done. Received signature data from %d participants", ended)
+				t.Log("EDDSA signing test done.")
+				break signing
 			}
 		}
 	}

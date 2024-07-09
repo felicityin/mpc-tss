@@ -1,4 +1,4 @@
-package sign
+package presign
 
 import (
 	"errors"
@@ -9,6 +9,7 @@ import (
 	"github.com/felicityin/mpc-tss/common"
 	"github.com/felicityin/mpc-tss/crypto"
 	"github.com/felicityin/mpc-tss/crypto/logproof"
+	"github.com/felicityin/mpc-tss/protocols/cggmp/eddsa/sign"
 	"github.com/felicityin/mpc-tss/tss"
 )
 
@@ -30,11 +31,11 @@ func (round *round2) Start() *tss.Error {
 			continue
 		}
 
-		r1msg1 := round.temp.signRound1Message1s[j].Content().(*SignRound1Message1)
+		r1msg1 := round.temp.signRound1Message1s[j].Content().(*sign.SignRound1Message1)
 		round.temp.kCiphertexts[j] = r1msg1.UnmarshalK()
 		common.Logger.Debugf("P[%d]: receive P[%d]'s kCiphertext", i, j)
 
-		r1msg2 := round.temp.signRound1Message2s[j].Content().(*SignRound1Message2)
+		r1msg2 := round.temp.signRound1Message2s[j].Content().(*sign.SignRound1Message2)
 		encProof, err := r1msg2.UnmarshalEncProof()
 		if err != nil {
 			common.Logger.Errorf("unmarshal enc proof failed, party: %d", j)
@@ -56,7 +57,7 @@ func (round *round2) Start() *tss.Error {
 
 	// Compute Ri = ki * G
 	common.Logger.Debugf("P[%d]: calc Ri", i)
-	Ri := crypto.ScalarBaseMult(round.EC(), round.temp.k)
+	Ri := crypto.ScalarBaseMult(round.EC(), round.save.K)
 
 	contextI := append(round.temp.ssid, big.NewInt(int64(i)).Bytes()...)
 
@@ -68,7 +69,7 @@ func (round *round2) Start() *tss.Error {
 		}
 		// logProof for the secret k, rho: M(prove, Πlog, (sid,i), (Iε,Ki,Ri,g); (ki,rhoi))
 		logProof, err := logproof.NewKnowExponentAndPaillierEncryption(
-			ProofParameter, contextI, round.temp.k, round.temp.rho, round.temp.kCiphertexts[i],
+			ProofParameter, contextI, round.save.K, round.temp.rho, round.temp.kCiphertexts[i],
 			round.aux.PaillierPKs[i].N, round.aux.PedersenPKs[j], Ri, nil,
 		)
 		if err != nil {
@@ -84,7 +85,7 @@ func (round *round2) Start() *tss.Error {
 		}
 
 		common.Logger.Debugf("P[%d]: send log proof to P[%d]", i, j)
-		r2msg := NewSignRound2Message(Pj, round.PartyID(), Ri, logProofBytes)
+		r2msg := sign.NewSignRound2Message(Pj, round.PartyID(), Ri, logProofBytes)
 		round.out <- r2msg
 	}
 
@@ -92,7 +93,7 @@ func (round *round2) Start() *tss.Error {
 }
 
 func (round *round2) CanAccept(msg tss.ParsedMessage) bool {
-	if _, ok := msg.Content().(*SignRound2Message); ok {
+	if _, ok := msg.Content().(*sign.SignRound2Message); ok {
 		return !msg.IsBroadcast()
 	}
 	return false

@@ -1,4 +1,4 @@
-package signing
+package presign
 
 import (
 	"errors"
@@ -7,8 +7,8 @@ import (
 
 	"github.com/felicityin/mpc-tss/common"
 	"github.com/felicityin/mpc-tss/crypto"
-	"github.com/felicityin/mpc-tss/protocols/cggmp/ecdsa/presign"
-	"github.com/felicityin/mpc-tss/protocols/cggmp/ecdsa/sign"
+	"github.com/felicityin/mpc-tss/protocols/cggmp/auxiliary"
+	"github.com/felicityin/mpc-tss/protocols/cggmp/eddsa/sign"
 	"github.com/felicityin/mpc-tss/protocols/cggmp/keygen"
 	"github.com/felicityin/mpc-tss/tss"
 )
@@ -24,32 +24,33 @@ type (
 		params *tss.Parameters
 
 		keys keygen.LocalPartySaveData
-		pre  presign.LocalPartySaveData
+		auxs auxiliary.LocalPartySaveData
 		temp localTempData
-		data *common.SignatureData
+		data LocalPartySaveData
 
 		// outbound messaging
 		out chan<- tss.Message
-		end chan<- *common.SignatureData
+		end chan<- *LocalPartySaveData
 	}
 
 	localMessageStore struct {
-		signRound1Messages []tss.ParsedMessage
+		signRound1Message1s,
+		signRound1Message2s,
+		signRound2Messages []tss.ParsedMessage
 	}
 
 	localTempData struct {
 		localMessageStore
 
 		isThreshold bool
-		msg         *big.Int
 
-		wi   *big.Int
-		pubW *crypto.ECPoint
+		wi    *big.Int
+		bigWs []*crypto.ECPoint
+		pubW  *crypto.ECPoint
 
-		// round 1
-		fullBytesLen int
-		Gamma        *crypto.ECPoint
-		si           *big.Int
+		// temp data (thrown away after sign) / round 1
+		rho          *big.Int
+		kCiphertexts []*big.Int
 
 		ssid      []byte
 		ssidNonce *big.Int
@@ -58,41 +59,37 @@ type (
 
 func NewLocalParty(
 	isThreshold bool,
-	msg *big.Int,
 	params *tss.Parameters,
 	key keygen.LocalPartySaveData,
-	pre presign.LocalPartySaveData,
+	aux auxiliary.LocalPartySaveData,
 	out chan<- tss.Message,
-	end chan<- *common.SignatureData,
+	end chan<- *LocalPartySaveData,
 	fullBytesLen ...int,
 ) tss.Party {
 	partyCount := len(params.Parties().IDs())
+	data := NewLocalPartySaveData(partyCount)
 	p := &LocalParty{
 		BaseParty: new(tss.BaseParty),
 		params:    params,
 		keys:      keygen.BuildLocalSaveDataSubset(key, params.Parties().IDs()),
-		pre:       presign.BuildLocalSaveDataSubset(pre, params.Parties().IDs()),
+		auxs:      aux,
 		temp:      localTempData{},
-		data:      &common.SignatureData{},
+		data:      data,
 		out:       out,
 		end:       end,
 	}
 	// msgs init
-	p.temp.signRound1Messages = make([]tss.ParsedMessage, partyCount)
+	p.temp.signRound1Message1s = make([]tss.ParsedMessage, partyCount)
+	p.temp.signRound1Message2s = make([]tss.ParsedMessage, partyCount)
+	p.temp.signRound2Messages = make([]tss.ParsedMessage, partyCount)
 
-	// temp data init
-	p.temp.msg = msg
-	if len(fullBytesLen) > 0 {
-		p.temp.fullBytesLen = fullBytesLen[0]
-	} else {
-		p.temp.fullBytesLen = 0
-	}
 	p.temp.isThreshold = isThreshold
+	p.temp.kCiphertexts = make([]*big.Int, partyCount)
 	return p
 }
 
 func (p *LocalParty) FirstRound() tss.Round {
-	return newRound1(p.temp.isThreshold, p.params, &p.keys, &p.pre, p.data, &p.temp, p.out, p.end)
+	return newRound1(p.temp.isThreshold, p.params, &p.keys, &p.auxs, &p.data, &p.temp, p.out, p.end)
 }
 
 func (p *LocalParty) Start() *tss.Error {
@@ -142,8 +139,14 @@ func (p *LocalParty) StoreMessage(msg tss.ParsedMessage) (bool, *tss.Error) {
 	// switch/case is necessary to store any messages beyond current round
 	// this does not handle message replays. we expect the caller to apply replay and spoofing protection.
 	switch msg.Content().(type) {
-	case *sign.SignRound4Message:
-		p.temp.signRound1Messages[fromPIdx] = msg
+	case *sign.SignRound1Message1:
+		p.temp.signRound1Message1s[fromPIdx] = msg
+
+	case *sign.SignRound1Message2:
+		p.temp.signRound1Message2s[fromPIdx] = msg
+
+	case *sign.SignRound2Message:
+		p.temp.signRound2Messages[fromPIdx] = msg
 
 	default: // unrecognised message, just ignore!
 		common.Logger.Warningf("unrecognised message ignored: %v", msg)

@@ -1,19 +1,20 @@
 package signing
 
 import (
-	"errors"
+	"crypto/sha512"
 	"fmt"
 	"math/big"
 
+	"github.com/agl/ed25519/edwards25519"
+	"github.com/pkg/errors"
+
 	"github.com/felicityin/mpc-tss/common"
 	"github.com/felicityin/mpc-tss/crypto"
-	"github.com/felicityin/mpc-tss/protocols/cggmp/ecdsa/presign"
-	"github.com/felicityin/mpc-tss/protocols/cggmp/ecdsa/sign"
+	"github.com/felicityin/mpc-tss/protocols/cggmp/eddsa/presign"
+	"github.com/felicityin/mpc-tss/protocols/cggmp/eddsa/sign"
 	"github.com/felicityin/mpc-tss/protocols/cggmp/keygen"
 	"github.com/felicityin/mpc-tss/tss"
 )
-
-var ProofParameter = crypto.NewProofConfig(tss.S256().Params().N)
 
 // round 1 represents round 1 of the signing part of the EDDSA TSS spec
 func newRound1(
@@ -35,12 +36,10 @@ func (round *round1) Start() *tss.Error {
 	if round.started {
 		return round.WrapError(errors.New("round already started"))
 	}
+
 	round.number = 1
 	round.started = true
 	round.resetOK()
-
-	Pi := round.PartyID()
-	i := Pi.Index
 
 	round.temp.ssidNonce = new(big.Int).SetUint64(0)
 	var err error
@@ -49,14 +48,40 @@ func (round *round1) Start() *tss.Error {
 		return round.WrapError(err)
 	}
 
-	common.Logger.Infof("[sign] party: %d, round_1 start", i)
+	i := round.PartyID().Index
+	common.Logger.Infof("[sign] party: %d, round_3 start", i)
 
-	modN := common.ModInt(round.EC().Params().N)
-	round.temp.si = modN.Add(modN.Mul(round.pre.K, round.temp.msg), modN.Mul(round.pre.R.X(), round.pre.Chi))
+	riBytes := bigIntToEncodedBytes(round.pre.K)
+	encodedR := bigIntToEncodedBytes(round.pre.R)
+	encodedPubKey := ecPointToEncodedBytes(round.temp.pubW.X(), round.temp.pubW.Y())
 
-	// broadcast sigma
-	common.Logger.Debugf("P[%d]: broadcast sigma", i)
-	r1msg := sign.NewSignRound4Message(round.PartyID(), round.temp.si)
+	// h = hash512(R || X || M)
+	h := sha512.New()
+	h.Reset()
+	h.Write(encodedR[:])
+	h.Write(encodedPubKey[:])
+	if round.temp.fullBytesLen == 0 {
+		h.Write(round.temp.m.Bytes())
+	} else {
+		var mBytes = make([]byte, round.temp.fullBytesLen)
+		round.temp.m.FillBytes(mBytes)
+		h.Write(mBytes)
+	}
+
+	var lambda [64]byte
+	h.Sum(lambda[:0])
+	var lambdaReduced [32]byte
+	edwards25519.ScReduce(&lambdaReduced, &lambda)
+
+	// compute si
+	var localS [32]byte
+	edwards25519.ScMulAdd(&localS, &lambdaReduced, bigIntToEncodedBytes(round.temp.wi), riBytes)
+
+	// store message pieces
+	round.temp.si = &localS
+
+	// broadcast si to other parties
+	r1msg := sign.NewSignRound3Message(round.PartyID(), encodedBytesToBigInt(&localS))
 	round.temp.signRound1Messages[i] = r1msg
 	round.out <- r1msg
 
@@ -79,7 +104,7 @@ func (round *round1) Update() (bool, *tss.Error) {
 }
 
 func (round *round1) CanAccept(msg tss.ParsedMessage) bool {
-	if _, ok := msg.Content().(*sign.SignRound4Message); ok {
+	if _, ok := msg.Content().(*sign.SignRound3Message); ok {
 		return msg.IsBroadcast()
 	}
 	return false

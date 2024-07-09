@@ -1,19 +1,20 @@
-package sign
+package presign
 
 import (
 	"errors"
 	"fmt"
 	"math/big"
 
+	edwards "github.com/decred/dcrd/dcrec/edwards/v2"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/felicityin/mpc-tss/common"
 	"github.com/felicityin/mpc-tss/crypto"
 	"github.com/felicityin/mpc-tss/crypto/encproof"
 	"github.com/felicityin/mpc-tss/protocols/cggmp/auxiliary"
+	"github.com/felicityin/mpc-tss/protocols/cggmp/eddsa/sign"
 	"github.com/felicityin/mpc-tss/protocols/cggmp/keygen"
 	"github.com/felicityin/mpc-tss/tss"
-
-	edwards "github.com/decred/dcrd/dcrec/edwards/v2"
-	"google.golang.org/protobuf/proto"
 )
 
 var ProofParameter = crypto.NewProofConfig(edwards.Edwards().N)
@@ -24,10 +25,10 @@ func newRound1(
 	params *tss.Parameters,
 	key *keygen.LocalPartySaveData,
 	aux *auxiliary.LocalPartySaveData,
-	data *common.SignatureData,
+	data *LocalPartySaveData,
 	temp *localTempData,
 	out chan<- tss.Message,
-	end chan<- *common.SignatureData,
+	end chan<- *LocalPartySaveData,
 ) tss.Round {
 	return &round1{
 		&base{params, isThreshold, key, aux, data, temp, out, end, make([]bool, len(params.Parties().IDs())), false, 1},
@@ -47,6 +48,10 @@ func (round *round1) Start() *tss.Error {
 	i := Pi.Index
 	common.Logger.Infof("[sign] party: %d, round_1 start", i)
 
+	ids := round.Parties().IDs().Keys()
+	round.save.Ks = ids
+	round.save.ShareID = ids[i]
+
 	round.temp.ssidNonce = new(big.Int).SetUint64(0)
 	var err error
 	round.temp.ssid, err = round.getSSID()
@@ -55,13 +60,13 @@ func (round *round1) Start() *tss.Error {
 	}
 
 	// k in F_q
-	round.temp.k = common.GetRandomPositiveInt(round.Rand(), round.Params().EC().Params().N)
+	round.save.K = common.GetRandomPositiveInt(round.Rand(), round.EC().Params().N)
 	common.Logger.Debugf("P[%d]: calc ki", i)
 
 	// Ki = enc(k, ρ)
 	kCiphertext, rho, err := round.aux.PaillierPKs[i].EncryptAndReturnRandomness(
 		round.Rand(),
-		round.temp.k,
+		round.save.K,
 	)
 	if err != nil {
 		common.Logger.Errorf("P[%d]: create enc proof failed: %s", i, err)
@@ -73,7 +78,7 @@ func (round *round1) Start() *tss.Error {
 
 	// broadcast Ki
 	common.Logger.Debugf("P[%d]: broadcast Ki", i)
-	r1msg1 := NewSignRound1Message1(round.PartyID(), kCiphertext)
+	r1msg1 := sign.NewSignRound1Message1(round.PartyID(), kCiphertext)
 	round.temp.signRound1Message1s[i] = r1msg1
 	round.out <- r1msg1
 
@@ -87,7 +92,7 @@ func (round *round1) Start() *tss.Error {
 		}
 		// M(prove, Πenc, (sid,i), (Iε,Ki); (ki,rhoi))
 		encProof, err := encproof.NewEncryptRangeMessage(ProofParameter, contextI, kCiphertext,
-			round.aux.PaillierPKs[i].N, round.temp.k, round.temp.rho, round.aux.PedersenPKs[j],
+			round.aux.PaillierPKs[i].N, round.save.K, round.temp.rho, round.aux.PedersenPKs[j],
 		)
 		if err != nil {
 			common.Logger.Errorf("create enc proof failed: %s, party: %d", err, j)
@@ -102,7 +107,7 @@ func (round *round1) Start() *tss.Error {
 		}
 
 		common.Logger.Debugf("P[%d]: p2p send enc proof", i)
-		r1msg2 := NewSignRound1Message2(Pj, round.PartyID(), encProofBytes)
+		r1msg2 := sign.NewSignRound1Message2(Pj, round.PartyID(), encProofBytes)
 		round.out <- r1msg2
 	}
 
@@ -130,10 +135,10 @@ func (round *round1) Update() (bool, *tss.Error) {
 }
 
 func (round *round1) CanAccept(msg tss.ParsedMessage) bool {
-	if _, ok := msg.Content().(*SignRound1Message1); ok {
+	if _, ok := msg.Content().(*sign.SignRound1Message1); ok {
 		return msg.IsBroadcast()
 	}
-	if _, ok := msg.Content().(*SignRound1Message2); ok {
+	if _, ok := msg.Content().(*sign.SignRound1Message2); ok {
 		return !msg.IsBroadcast()
 	}
 	return false

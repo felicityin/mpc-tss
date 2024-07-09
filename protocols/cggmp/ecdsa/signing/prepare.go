@@ -69,5 +69,6 @@ func PrepareForSigning(
 		}
 		bigWs[j] = bigWj
 	}
+
 	return
 }

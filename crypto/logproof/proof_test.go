@@ -132,10 +132,4 @@ func TestInner1(test *testing.T) {
 	gz1 := G.ScalarMult(z1)
 	assert.Equal(test, gz1.X(), YXexpe.X())
 	assert.Equal(test, gz1.Y(), YXexpe.Y())
-
-	fmt.Printf("v--------------------------gz1.x: %d\n", gz1.X())
-	fmt.Printf("v--------------------------gz1.y: %d\n", gz1.Y())
-	fmt.Printf("v--------------------------YXexpe.x: %d\n", YXexpe.X())
-	fmt.Printf("v--------------------------YXexpe.y: %d\n", YXexpe.Y())
-	assert.True(test, false)
 }

@@ -47,7 +47,7 @@ func TestE2ENonThresholdConcurrent(t *testing.T) {
 	assert.Equal(t, threshold, len(keys))
 	assert.Equal(t, threshold, len(signPIDs))
 
-	pres, _, err := presign.LoadAuxTestFixtures(false, keygen.Ecdsa, threshold)
+	pres, _, err := presign.LoadPreTestFixtures(false, threshold)
 	assert.NoError(t, err, "should load aux fixtures")
 	assert.Equal(t, threshold, len(pres))
 
@@ -146,7 +146,7 @@ func TestE2EThresholdConcurrent(t *testing.T) {
 	keys, signPIDs, err := tKeygen.LoadKeygenTestFixturesRandomSet(keygen.Ecdsa, testThreshold+1, testParticipants)
 	assert.NoError(t, err, "should load keygen fixtures")
 
-	pres, _, err := presign.LoadAuxTestFixtures(true, keygen.Ecdsa, testThreshold+1)
+	pres, _, err := presign.LoadPreTestFixtures(true, testThreshold+1)
 	assert.NoError(t, err, "should load aux fixtures")
 
 	// PHASE: signing

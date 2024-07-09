@@ -167,23 +167,14 @@ func (round *round1) prepare() error {
 		if round.Threshold()+1 > len(ks) {
 			return fmt.Errorf("t+1=%d is not satisfied by the key count of %d", round.Threshold()+1, len(ks))
 		}
-		wi, bigWs := PrepareForSigning(round.Params().EC(), i, len(ks), privXi, ks, pubXjs)
+
+		wi, bigWs, pubKey, err := crypto.PrepareForSigning(round.Params().EC(), i, len(ks), privXi, ks, pubXjs)
+		if err != nil {
+			return err
+		}
 
 		round.temp.wi = wi
 		round.temp.bigWs = bigWs
-
-		pubKey := bigWs[0]
-		var err error
-		for j, pubx := range bigWs {
-			if j == 0 {
-				continue
-			}
-			pubKey, err = pubKey.Add(pubx)
-			if err != nil {
-				common.Logger.Errorf("calc pubkey failed, party: %d", j)
-				return round.WrapError(err)
-			}
-		}
 		round.temp.pubW = pubKey
 	}
 

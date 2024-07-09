@@ -6,15 +6,13 @@ import (
 	"math/big"
 
 	"github.com/felicityin/mpc-tss/common"
-	"github.com/felicityin/mpc-tss/crypto"
 	"github.com/felicityin/mpc-tss/tss"
 )
 
 type (
 	LocalSecrets struct {
 		K       *big.Int
-		Chi     *big.Int
-		R       *crypto.ECPoint
+		R       *big.Int
 		ShareID *big.Int
 	}
 

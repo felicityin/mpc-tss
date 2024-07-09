@@ -20,7 +20,8 @@ type (
 		ChainCode       *big.Int
 	}
 
-	LocalKeygenSavaData struct {
+	// Everything in LocalPartySaveData is saved locally to user's HD when done
+	LocalPartySaveData struct {
 		LocalKeygenSecrets
 
 		// original indexes (ki in signing preparation phase)
@@ -31,11 +32,6 @@ type (
 
 		// used for assertions and derive child
 		Pubkey *crypto.ECPoint // y
-	}
-
-	// Everything in LocalPartySaveData is saved locally to user's HD when done
-	LocalPartySaveData struct {
-		LocalKeygenSavaData
 	}
 )
 
@@ -69,7 +65,7 @@ func BuildLocalSaveDataSubset(sourceData LocalPartySaveData, sortedIDs tss.Sorte
 		keysToIndices[hex.EncodeToString(kj.Bytes())] = j
 	}
 	newData := NewLocalPartySaveData(sortedIDs.Len())
-	newData.LocalKeygenSavaData = sourceData.LocalKeygenSavaData
+	newData.LocalKeygenSecrets = sourceData.LocalKeygenSecrets
 	newData.Pubkey = sourceData.Pubkey
 	for j, id := range sortedIDs {
 		savedIdx, ok := keysToIndices[hex.EncodeToString(id.Key)]

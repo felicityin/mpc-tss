@@ -16,7 +16,7 @@ import (
 const (
 	testNonThresholdFixtureDirFormat = "%s/../../test/_presign_fixtures/non_threshold"
 	testThresholdFixtureDirFormat    = "%s/../../test/_presign_fixtures/threshold"
-	testFixtureFileFormat            = "ecdsa_presign_data_%d.json"
+	testFixtureFileFormat            = "eddsa_presign_data_%d.json"
 )
 
 func LoadPreTestFixtures(isThreshold bool, qty int, optionalStart ...int) ([]LocalPartySaveData, tss.SortedPartyIDs, error) {

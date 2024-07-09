@@ -29,6 +29,7 @@ func (round *round4) Start() *tss.Error {
 	sumBigDelta := round.temp.Delta
 
 	for j, Pj := range round.Parties().IDs() {
+		round.ok[j] = true
 		if j == i {
 			continue
 		}

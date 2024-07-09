@@ -7,8 +7,8 @@ import (
 
 	"github.com/felicityin/mpc-tss/common"
 	"github.com/felicityin/mpc-tss/crypto"
-	"github.com/felicityin/mpc-tss/protocols/cggmp/ecdsa/presign"
-	"github.com/felicityin/mpc-tss/protocols/cggmp/ecdsa/sign"
+	"github.com/felicityin/mpc-tss/protocols/cggmp/eddsa/presign"
+	"github.com/felicityin/mpc-tss/protocols/cggmp/eddsa/sign"
 	"github.com/felicityin/mpc-tss/protocols/cggmp/keygen"
 	"github.com/felicityin/mpc-tss/tss"
 )
@@ -24,7 +24,7 @@ type (
 		params *tss.Parameters
 
 		keys keygen.LocalPartySaveData
-		pre  presign.LocalPartySaveData
+		pres presign.LocalPartySaveData
 		temp localTempData
 		data *common.SignatureData
 
@@ -40,16 +40,14 @@ type (
 	localTempData struct {
 		localMessageStore
 
-		isThreshold bool
-		msg         *big.Int
+		isThreshold  bool
+		m            *big.Int
+		fullBytesLen int
 
 		wi   *big.Int
 		pubW *crypto.ECPoint
 
-		// round 1
-		fullBytesLen int
-		Gamma        *crypto.ECPoint
-		si           *big.Int
+		si *[32]byte
 
 		ssid      []byte
 		ssidNonce *big.Int
@@ -71,7 +69,7 @@ func NewLocalParty(
 		BaseParty: new(tss.BaseParty),
 		params:    params,
 		keys:      keygen.BuildLocalSaveDataSubset(key, params.Parties().IDs()),
-		pre:       presign.BuildLocalSaveDataSubset(pre, params.Parties().IDs()),
+		pres:      presign.BuildLocalSaveDataSubset(pre, params.Parties().IDs()),
 		temp:      localTempData{},
 		data:      &common.SignatureData{},
 		out:       out,
@@ -81,7 +79,7 @@ func NewLocalParty(
 	p.temp.signRound1Messages = make([]tss.ParsedMessage, partyCount)
 
 	// temp data init
-	p.temp.msg = msg
+	p.temp.m = msg
 	if len(fullBytesLen) > 0 {
 		p.temp.fullBytesLen = fullBytesLen[0]
 	} else {
@@ -92,7 +90,7 @@ func NewLocalParty(
 }
 
 func (p *LocalParty) FirstRound() tss.Round {
-	return newRound1(p.temp.isThreshold, p.params, &p.keys, &p.pre, p.data, &p.temp, p.out, p.end)
+	return newRound1(p.temp.isThreshold, p.params, &p.keys, &p.pres, p.data, &p.temp, p.out, p.end)
 }
 
 func (p *LocalParty) Start() *tss.Error {
@@ -142,7 +140,8 @@ func (p *LocalParty) StoreMessage(msg tss.ParsedMessage) (bool, *tss.Error) {
 	// switch/case is necessary to store any messages beyond current round
 	// this does not handle message replays. we expect the caller to apply replay and spoofing protection.
 	switch msg.Content().(type) {
-	case *sign.SignRound4Message:
+
+	case *sign.SignRound3Message:
 		p.temp.signRound1Messages[fromPIdx] = msg
 
 	default: // unrecognised message, just ignore!
