@@ -7,6 +7,7 @@ import (
 
 	"github.com/felicityin/mpc-tss/common"
 	"github.com/felicityin/mpc-tss/crypto"
+	"github.com/felicityin/mpc-tss/protocols"
 	"github.com/felicityin/mpc-tss/protocols/cggmp/ecdsa/presign"
 	"github.com/felicityin/mpc-tss/protocols/cggmp/ecdsa/sign"
 	"github.com/felicityin/mpc-tss/protocols/cggmp/keygen"
@@ -106,7 +107,7 @@ func (round *round1) prepare() error {
 			return fmt.Errorf("t+1=%d is not satisfied by the key count of %d", round.Threshold()+1, len(ks))
 		}
 
-		wi, _, pubKey, err := crypto.PrepareForSigning(round.Params().EC(), i, len(ks), privXi, ks, pubXjs)
+		wi, _, pubKey, err := protocols.PrepareForSigning(round.Params().EC(), i, len(ks), privXi, ks, pubXjs)
 		if err != nil {
 			return err
 		}

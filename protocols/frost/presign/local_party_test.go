@@ -1,21 +1,17 @@
 // Copyright © 2019 Binance
 
-package sign
+package presign
 
 import (
-	"encoding/hex"
-	"fmt"
-	"math/big"
+	"encoding/json"
+	"os"
 	"sync/atomic"
 	"testing"
 
-	"github.com/agl/ed25519/edwards25519"
-	edwards "github.com/decred/dcrd/dcrec/edwards/v2"
 	"github.com/ipfs/go-log"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/felicityin/mpc-tss/common"
-	"github.com/felicityin/mpc-tss/crypto"
 	"github.com/felicityin/mpc-tss/protocols/cggmp/keygen"
 	nonKeygen "github.com/felicityin/mpc-tss/protocols/cggmp/keygen/non_threshold"
 	tKeygen "github.com/felicityin/mpc-tss/protocols/cggmp/keygen/threshold"
@@ -37,7 +33,7 @@ func setUp(level string) {
 	tss.SetCurve(tss.Edwards())
 }
 
-func TestE2ENonThresholdConcurrent(t *testing.T) {
+func TestE2EConcurrent(t *testing.T) {
 	setUp("debug")
 
 	threshold := testParticipants
@@ -55,16 +51,15 @@ func TestE2ENonThresholdConcurrent(t *testing.T) {
 
 	errCh := make(chan *tss.Error, len(signPIDs))
 	outCh := make(chan tss.Message, len(signPIDs))
-	endCh := make(chan *common.SignatureData, len(signPIDs))
+	endCh := make(chan *LocalPartySaveData, len(signPIDs))
 
 	updater := test.SharedPartyUpdater
 
-	msg := big.NewInt(200)
 	// init the parties
 	for i := 0; i < len(signPIDs); i++ {
 		params := tss.NewParameters(tss.Edwards(), p2pCtx, signPIDs[i], len(signPIDs), threshold)
 
-		P := NewLocalParty(false, msg, params, keys[i], outCh, endCh).(*LocalParty)
+		P := NewLocalParty(params, outCh, endCh).(*LocalParty)
 		parties = append(parties, P)
 		go func(P *LocalParty) {
 			if err := P.Start(); err != nil {
@@ -100,74 +95,29 @@ SIGN:
 				go updater(parties[dest[0].Index], msg, errCh)
 			}
 
-		case <-endCh:
+		case save := <-endCh:
+			index, err := save.OriginalIndex()
+			assert.NoErrorf(t, err, "should not be an error getting a party's index from save data")
+			tryWriteTestFixtureFile(t, false, index, *save)
+
 			atomic.AddInt32(&ended, 1)
 			if atomic.LoadInt32(&ended) == int32(len(signPIDs)) {
-				t.Logf("Done. Received signature data from %d participants", ended)
-				x := new(big.Int)
-				for _, Pj := range parties {
-					xj := Pj.keys.PrivXi
-					gXj := crypto.ScalarBaseMult(tss.Edwards(), xj)
-					BigXj := Pj.keys.PubXj[Pj.PartyID().Index]
-					assert.True(t, BigXj.Equals(gXj), "ensure BigX_j == g^x_j")
-
-					x = x.Add(x, Pj.keys.PrivXi)
-				}
-
-				x = new(big.Int).Mod(x, tss.Edwards().Params().N)
-
-				xG := crypto.ScalarBaseMult(tss.Edwards(), x)
-				assert.True(t, xG.Equals(keys[0].Pubkey), "ensure X == g^x")
-
-				R := parties[0].temp.r
-
-				// BEGIN check s correctness
-				sumS := parties[0].temp.si
-				for i, p := range parties {
-					if i == 0 {
-						continue
-					}
-
-					var tmpSumS [32]byte
-					edwards25519.ScMulAdd(&tmpSumS, sumS, bigIntToEncodedBytes(big.NewInt(1)), p.temp.si)
-					sumS = &tmpSumS
-				}
-				fmt.Printf("S: %s\n", encodedBytesToBigInt(sumS).String())
-				fmt.Printf("R: %s\n", R.String())
-				// END check s correctness
-
-				// BEGIN EDDSA verify
-				pkX, pkY := keys[0].Pubkey.X(), keys[0].Pubkey.Y()
-				pk := edwards.PublicKey{
-					Curve: tss.Edwards(),
-					X:     pkX,
-					Y:     pkY,
-				}
-
-				newSig, err := edwards.ParseSignature(parties[0].data.Signature)
-				if err != nil {
-					println("new sig error, ", err.Error())
-				}
-
-				ok := edwards.Verify(&pk, msg.Bytes(), newSig.R, newSig.S)
-				assert.True(t, ok, "eddsa verify must pass")
-				t.Log("EDDSA signing test done.")
-				// END EDDSA verify
-
 				break SIGN
 			}
 		}
 	}
 }
 
-func TestE2EThresholdConcurrent(t *testing.T) {
-	setUp("info")
+func TestE2EConcurrent1(t *testing.T) {
+	setUp("debug")
 
-	threshold := testThreshold
+	threshold := testParticipants
 
 	// PHASE: load keygen fixtures
-	keys, signPIDs, err := tKeygen.LoadKeygenTestFixturesRandomSet(keygen.Eddsa, threshold+1, testParticipants)
+	keys, signPIDs, err := tKeygen.LoadKeygenTestFixturesRandomSet(keygen.Eddsa, threshold, testParticipants)
 	assert.NoError(t, err, "should load keygen fixtures")
+	assert.Equal(t, threshold, len(keys))
+	assert.Equal(t, threshold, len(signPIDs))
 
 	// PHASE: signing
 
@@ -176,15 +126,15 @@ func TestE2EThresholdConcurrent(t *testing.T) {
 
 	errCh := make(chan *tss.Error, len(signPIDs))
 	outCh := make(chan tss.Message, len(signPIDs))
-	endCh := make(chan *common.SignatureData, len(signPIDs))
+	endCh := make(chan *LocalPartySaveData, len(signPIDs))
 
 	updater := test.SharedPartyUpdater
 
-	msg, _ := hex.DecodeString("00f163ee51bcaeff9cdff5e0e3c1a646abd19885fffbab0b3b4236e0cf95c9f5")
 	// init the parties
 	for i := 0; i < len(signPIDs); i++ {
 		params := tss.NewParameters(tss.Edwards(), p2pCtx, signPIDs[i], len(signPIDs), threshold)
-		P := NewLocalParty(true, new(big.Int).SetBytes(msg), params, keys[i], outCh, endCh, len(msg)).(*LocalParty)
+
+		P := NewLocalParty(params, outCh, endCh).(*LocalParty)
 		parties = append(parties, P)
 		go func(P *LocalParty) {
 			if err := P.Start(); err != nil {
@@ -194,13 +144,13 @@ func TestE2EThresholdConcurrent(t *testing.T) {
 	}
 
 	var ended int32
-signing:
+SIGN:
 	for {
 		select {
 		case err := <-errCh:
 			common.Logger.Errorf("Error: %s", err)
 			assert.FailNow(t, err.Error())
-			break signing
+			break SIGN
 
 		case msg := <-outCh:
 			dest := msg.GetTo()
@@ -213,54 +163,48 @@ signing:
 					go updater(P, msg, errCh)
 				}
 			} else {
-				common.Logger.Debugf("recv p2p msg from %d, send to", msg.GetFrom().Index, dest[0].Index)
+				common.Logger.Debugf("recv p2p msg from %d, send to %d", msg.GetFrom().Index, dest[0].Index)
 				if dest[0].Index == msg.GetFrom().Index {
 					t.Fatalf("party %d tried to send a message to itself (%d)", dest[0].Index, msg.GetFrom().Index)
 				}
 				go updater(parties[dest[0].Index], msg, errCh)
 			}
 
-		case <-endCh:
+		case save := <-endCh:
+			index, err := save.OriginalIndex()
+			assert.NoErrorf(t, err, "should not be an error getting a party's index from save data")
+			tryWriteTestFixtureFile(t, true, index, *save)
+
 			atomic.AddInt32(&ended, 1)
 			if atomic.LoadInt32(&ended) == int32(len(signPIDs)) {
-				t.Logf("Done. Received signature data from %d participants", ended)
-				R := parties[0].temp.r
-
-				// BEGIN check s correctness
-				sumS := parties[0].temp.si
-				for i, p := range parties {
-					if i == 0 {
-						continue
-					}
-
-					var tmpSumS [32]byte
-					edwards25519.ScMulAdd(&tmpSumS, sumS, bigIntToEncodedBytes(big.NewInt(1)), p.temp.si)
-					sumS = &tmpSumS
-				}
-				fmt.Printf("S: %s\n", encodedBytesToBigInt(sumS).String())
-				fmt.Printf("R: %s\n", R.String())
-				// END check s correctness
-
-				// BEGIN EDDSA verify
-				pkX, pkY := parties[0].temp.pubW.X(), parties[0].temp.pubW.Y()
-				pk := edwards.PublicKey{
-					Curve: tss.Edwards(),
-					X:     pkX,
-					Y:     pkY,
-				}
-
-				newSig, err := edwards.ParseSignature(parties[0].data.Signature)
-				if err != nil {
-					println("new sig error, ", err.Error())
-				}
-
-				ok := edwards.Verify(&pk, msg, newSig.R, newSig.S)
-				assert.True(t, ok, "eddsa verify must pass")
-				t.Log("EDDSA signing test done.")
-				// END EDDSA verify
-
-				break signing
+				break SIGN
 			}
 		}
 	}
+}
+
+func tryWriteTestFixtureFile(t *testing.T, isThreshold bool, index int, data LocalPartySaveData) {
+	fixtureFileName := makeTestFixtureFilePath(isThreshold, index)
+
+	// fixture file does not already exist?
+	// if it does, we won't re-create it here
+	fi, err := os.Stat(fixtureFileName)
+	if !(err == nil && fi != nil && !fi.IsDir()) {
+		fd, err := os.OpenFile(fixtureFileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+		if err != nil {
+			assert.NoErrorf(t, err, "unable to open fixture file %s for writing", fixtureFileName)
+		}
+		bz, err := json.Marshal(&data)
+		if err != nil {
+			t.Fatalf("unable to marshal save data for fixture file %s", fixtureFileName)
+		}
+		_, err = fd.Write(bz)
+		if err != nil {
+			t.Fatalf("unable to write to fixture file %s", fixtureFileName)
+		}
+		t.Logf("Saved a test fixture file for party %d: %s", index, fixtureFileName)
+	} else {
+		t.Logf("Fixture file already exists for party %d; not re-creating: %s", index, fixtureFileName)
+	}
+	//
 }

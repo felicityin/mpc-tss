@@ -1,3 +1,3 @@
 # Description
 
-Generate Paillier and ring-Pedersen parameters for presign.
+Generate Paillier and ring-Pedersen parameters for pre-signing.

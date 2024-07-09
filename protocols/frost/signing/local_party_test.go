@@ -1,6 +1,6 @@
 // Copyright © 2019 Binance
 
-package sign
+package signing
 
 import (
 	"encoding/hex"
@@ -20,6 +20,7 @@ import (
 	nonKeygen "github.com/felicityin/mpc-tss/protocols/cggmp/keygen/non_threshold"
 	tKeygen "github.com/felicityin/mpc-tss/protocols/cggmp/keygen/threshold"
 	"github.com/felicityin/mpc-tss/protocols/cggmp/test"
+	"github.com/felicityin/mpc-tss/protocols/frost/presign"
 	"github.com/felicityin/mpc-tss/tss"
 )
 
@@ -48,6 +49,10 @@ func TestE2ENonThresholdConcurrent(t *testing.T) {
 	assert.Equal(t, threshold, len(keys))
 	assert.Equal(t, threshold, len(signPIDs))
 
+	pres, _, err := presign.LoadPreTestFixtures(false, threshold)
+	assert.NoError(t, err, "should load aux fixtures")
+	assert.Equal(t, threshold, len(pres))
+
 	// PHASE: signing
 
 	p2pCtx := tss.NewPeerContext(signPIDs)
@@ -64,7 +69,7 @@ func TestE2ENonThresholdConcurrent(t *testing.T) {
 	for i := 0; i < len(signPIDs); i++ {
 		params := tss.NewParameters(tss.Edwards(), p2pCtx, signPIDs[i], len(signPIDs), threshold)
 
-		P := NewLocalParty(false, msg, params, keys[i], outCh, endCh).(*LocalParty)
+		P := NewLocalParty(false, msg, params, keys[i], pres[i], outCh, endCh).(*LocalParty)
 		parties = append(parties, P)
 		go func(P *LocalParty) {
 			if err := P.Start(); err != nil {
@@ -169,6 +174,9 @@ func TestE2EThresholdConcurrent(t *testing.T) {
 	keys, signPIDs, err := tKeygen.LoadKeygenTestFixturesRandomSet(keygen.Eddsa, threshold+1, testParticipants)
 	assert.NoError(t, err, "should load keygen fixtures")
 
+	pres, _, err := presign.LoadPreTestFixtures(true, testThreshold+1)
+	assert.NoError(t, err, "should load aux fixtures")
+
 	// PHASE: signing
 
 	p2pCtx := tss.NewPeerContext(signPIDs)
@@ -184,7 +192,7 @@ func TestE2EThresholdConcurrent(t *testing.T) {
 	// init the parties
 	for i := 0; i < len(signPIDs); i++ {
 		params := tss.NewParameters(tss.Edwards(), p2pCtx, signPIDs[i], len(signPIDs), threshold)
-		P := NewLocalParty(true, new(big.Int).SetBytes(msg), params, keys[i], outCh, endCh, len(msg)).(*LocalParty)
+		P := NewLocalParty(true, new(big.Int).SetBytes(msg), params, keys[i], pres[i], outCh, endCh, len(msg)).(*LocalParty)
 		parties = append(parties, P)
 		go func(P *LocalParty) {
 			if err := P.Start(); err != nil {

@@ -1,4 +1,4 @@
-package sign
+package signing
 
 import (
 	"errors"
@@ -7,8 +7,9 @@ import (
 
 	"github.com/felicityin/mpc-tss/common"
 	"github.com/felicityin/mpc-tss/crypto"
-	"github.com/felicityin/mpc-tss/protocols/cggmp/auxiliary"
 	"github.com/felicityin/mpc-tss/protocols/cggmp/keygen"
+	"github.com/felicityin/mpc-tss/protocols/frost/presign"
+	"github.com/felicityin/mpc-tss/protocols/frost/sign"
 	"github.com/felicityin/mpc-tss/tss"
 )
 
@@ -23,7 +24,7 @@ type (
 		params *tss.Parameters
 
 		keys keygen.LocalPartySaveData
-		auxs auxiliary.LocalPartySaveData
+		pres presign.LocalPartySaveData
 		temp localTempData
 		data *common.SignatureData
 
@@ -33,46 +34,26 @@ type (
 	}
 
 	localMessageStore struct {
-		signRound1Message1s,
-		signRound1Message2s,
-		signRound2Messages,
-		signRound3Messages,
-		signRound4Messages []tss.ParsedMessage
+		signRound1Messages []tss.ParsedMessage
 	}
 
 	localTempData struct {
 		localMessageStore
 
-		msg         *big.Int
 		isThreshold bool
 
 		wi    *big.Int
 		bigWs []*crypto.ECPoint
 		pubW  *crypto.ECPoint
 
+		m            *big.Int
+		r            *big.Int
+		fullBytesLen int
+
 		// round 1
-		k                *big.Int
-		gamma            *big.Int
-		kCiphertexts     []*big.Int
-		gammaCiphertexts []*big.Int
-		rho              *big.Int
-		mu               *big.Int
-		fullBytesLen     int
-
-		// round 2
-		beta    []*big.Int
-		betaHat []*big.Int
-		Gamma   *crypto.ECPoint
-
-		// round 3
-		sumGamma *crypto.ECPoint
-		chi      *big.Int
-		delta    *big.Int
-		Delta    *crypto.ECPoint
-
-		// round 4
-		R  *crypto.ECPoint
-		si *big.Int
+		c  *big.Int
+		Rj []*crypto.ECPoint
+		si *[32]byte
 
 		ssid      []byte
 		ssidNonce *big.Int
@@ -84,7 +65,7 @@ func NewLocalParty(
 	msg *big.Int,
 	params *tss.Parameters,
 	key keygen.LocalPartySaveData,
-	aux auxiliary.LocalPartySaveData,
+	pre presign.LocalPartySaveData,
 	out chan<- tss.Message,
 	end chan<- *common.SignatureData,
 	fullBytesLen ...int,
@@ -94,36 +75,29 @@ func NewLocalParty(
 		BaseParty: new(tss.BaseParty),
 		params:    params,
 		keys:      keygen.BuildLocalSaveDataSubset(key, params.Parties().IDs()),
-		auxs:      aux,
+		pres:      presign.BuildLocalSaveDataSubset(pre, params.Parties().IDs()),
 		temp:      localTempData{},
 		data:      &common.SignatureData{},
 		out:       out,
 		end:       end,
 	}
 	// msgs init
-	p.temp.signRound1Message1s = make([]tss.ParsedMessage, partyCount)
-	p.temp.signRound1Message2s = make([]tss.ParsedMessage, partyCount)
-	p.temp.signRound2Messages = make([]tss.ParsedMessage, partyCount)
-	p.temp.signRound3Messages = make([]tss.ParsedMessage, partyCount)
-	p.temp.signRound4Messages = make([]tss.ParsedMessage, partyCount)
+	p.temp.signRound1Messages = make([]tss.ParsedMessage, partyCount)
 
 	// temp data init
-	p.temp.msg = msg
+	p.temp.m = msg
 	if len(fullBytesLen) > 0 {
 		p.temp.fullBytesLen = fullBytesLen[0]
 	} else {
 		p.temp.fullBytesLen = 0
 	}
 	p.temp.isThreshold = isThreshold
-	p.temp.kCiphertexts = make([]*big.Int, partyCount)
-	p.temp.gammaCiphertexts = make([]*big.Int, partyCount)
-	p.temp.beta = make([]*big.Int, partyCount)
-	p.temp.betaHat = make([]*big.Int, partyCount)
+	p.temp.Rj = make([]*crypto.ECPoint, partyCount)
 	return p
 }
 
 func (p *LocalParty) FirstRound() tss.Round {
-	return newRound1(p.temp.isThreshold, p.params, &p.keys, &p.auxs, p.data, &p.temp, p.out, p.end)
+	return newRound1(p.temp.isThreshold, p.params, &p.keys, &p.pres, p.data, &p.temp, p.out, p.end)
 }
 
 func (p *LocalParty) Start() *tss.Error {
@@ -173,20 +147,9 @@ func (p *LocalParty) StoreMessage(msg tss.ParsedMessage) (bool, *tss.Error) {
 	// switch/case is necessary to store any messages beyond current round
 	// this does not handle message replays. we expect the caller to apply replay and spoofing protection.
 	switch msg.Content().(type) {
-	case *SignRound1Message1:
-		p.temp.signRound1Message1s[fromPIdx] = msg
 
-	case *SignRound1Message2:
-		p.temp.signRound1Message2s[fromPIdx] = msg
-
-	case *SignRound2Message:
-		p.temp.signRound2Messages[fromPIdx] = msg
-
-	case *SignRound3Message:
-		p.temp.signRound3Messages[fromPIdx] = msg
-
-	case *SignRound4Message:
-		p.temp.signRound4Messages[fromPIdx] = msg
+	case *sign.SignRound2Message:
+		p.temp.signRound1Messages[fromPIdx] = msg
 
 	default: // unrecognised message, just ignore!
 		common.Logger.Warningf("unrecognised message ignored: %v", msg)

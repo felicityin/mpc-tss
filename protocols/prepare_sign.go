@@ -4,7 +4,7 @@
 // terms governing use, modification, and redistribution, is contained in the
 // file LICENSE at the root of the source code distribution tree.
 
-package crypto
+package protocols
 
 import (
 	"crypto/elliptic"
@@ -12,6 +12,7 @@ import (
 	"math/big"
 
 	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/crypto"
 )
 
 func PrepareForSigning(
@@ -19,8 +20,8 @@ func PrepareForSigning(
 	i, pax int,
 	privXi *big.Int,
 	ks []*big.Int,
-	pubXj []*ECPoint,
-) (wi *big.Int, bigWs []*ECPoint, sumW *ECPoint, err error) {
+	pubXj []*crypto.ECPoint,
+) (wi *big.Int, bigWs []*crypto.ECPoint, sumW *crypto.ECPoint, err error) {
 	modQ := common.ModInt(ec.Params().N)
 	if len(ks) != len(pubXj) {
 		err = fmt.Errorf("PrepareForSigning: len(ks) != len(bigXs) (%d != %d)", len(ks), len(pubXj))
@@ -54,7 +55,7 @@ func PrepareForSigning(
 	}
 
 	// 5-10.
-	bigWs = make([]*ECPoint, len(ks))
+	bigWs = make([]*crypto.ECPoint, len(ks))
 	for j := 0; j < pax; j++ {
 		bigWj := pubXj[j]
 		for c := 0; c < pax; c++ {

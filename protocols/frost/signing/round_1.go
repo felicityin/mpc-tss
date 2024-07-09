@@ -4,15 +4,16 @@ import (
 	"crypto/sha512"
 	"fmt"
 	"math/big"
+	"strconv"
 
 	"github.com/agl/ed25519/edwards25519"
 	"github.com/pkg/errors"
 
 	"github.com/felicityin/mpc-tss/common"
 	"github.com/felicityin/mpc-tss/protocols"
-	"github.com/felicityin/mpc-tss/protocols/cggmp/eddsa/presign"
-	"github.com/felicityin/mpc-tss/protocols/cggmp/eddsa/sign"
 	"github.com/felicityin/mpc-tss/protocols/cggmp/keygen"
+	"github.com/felicityin/mpc-tss/protocols/frost/presign"
+	"github.com/felicityin/mpc-tss/protocols/frost/sign"
 	"github.com/felicityin/mpc-tss/tss"
 )
 
@@ -37,9 +38,12 @@ func (round *round1) Start() *tss.Error {
 		return round.WrapError(errors.New("round already started"))
 	}
 
-	round.number = 1
+	round.number = 2
 	round.started = true
 	round.resetOK()
+
+	i := round.PartyID().Index
+	common.Logger.Infof("[sign] party: %d, round_2 start", i)
 
 	round.temp.ssidNonce = new(big.Int).SetUint64(0)
 	var err error
@@ -48,11 +52,65 @@ func (round *round1) Start() *tss.Error {
 		return round.WrapError(err)
 	}
 
-	i := round.PartyID().Index
-	common.Logger.Infof("[sign] party: %d, round_3 start", i)
+	var B []byte
 
-	riBytes := bigIntToEncodedBytes(round.pre.K)
-	encodedR := bigIntToEncodedBytes(round.pre.R)
+	for j := range round.Parties().IDs() {
+		bs := common.SHA512_256(
+			round.pre.DEs[j].D.X().Bytes(),
+			round.pre.DEs[j].D.Y().Bytes(),
+			round.pre.DEs[j].E.X().Bytes(),
+			round.pre.DEs[j].E.Y().Bytes(),
+		)
+
+		B = append(B, round.temp.bigWs[j].X().Bytes()...)
+		B = append(B, bs...)
+	}
+
+	rhoi := new(big.Int).SetBytes(
+		common.SHA512_256([]byte(strconv.Itoa(i)), round.temp.m.Bytes(), common.SHA512_256(B)),
+	)
+	rhoi.Mod(rhoi, round.EC().Params().N)
+
+	ki := new(big.Int).Mul(round.pre.E, rhoi)
+	ki.Add(ki, round.pre.D)
+	ki.Mod(ki, round.EC().Params().N)
+
+	var R edwards25519.ExtendedGroupElement
+	riBytes := bigIntToEncodedBytes(ki)
+	edwards25519.GeScalarMultBase(&R, riBytes)
+
+	for j, Pj := range round.Parties().IDs() {
+		if j == i {
+			continue
+		}
+
+		rhoj := new(big.Int).SetBytes(
+			common.SHA512_256([]byte(strconv.Itoa(j)), round.temp.m.Bytes(), common.SHA512_256(B)),
+		)
+		rhoj.Mod(rhoj, round.EC().Params().N)
+
+		D := round.pre.DEs[j].D
+		E := round.pre.DEs[j].E
+
+		Rj, err := E.ScalarMult(rhoj).Add(D)
+		if err != nil {
+			return round.WrapError(fmt.Errorf("rho * E + D err: %s", err.Error()), Pj)
+		}
+		round.temp.Rj[j] = Rj
+
+		Rj = Rj.EightInvEight()
+		if err != nil {
+			return round.WrapError(errors.Wrapf(err, "NewECPoint(Rj)"), Pj)
+		}
+
+		extendedRj := ecPointToExtendedElement(round.EC(), Rj.X(), Rj.Y(), round.Rand())
+		R = addExtendedElements(R, extendedRj)
+	}
+
+	// compute lambda
+	var encodedR [32]byte
+	R.ToBytes(&encodedR)
+
 	encodedPubKey := ecPointToEncodedBytes(round.temp.pubW.X(), round.temp.pubW.Y())
 
 	// h = hash512(R || X || M)
@@ -77,13 +135,15 @@ func (round *round1) Start() *tss.Error {
 	var localS [32]byte
 	edwards25519.ScMulAdd(&localS, &lambdaReduced, bigIntToEncodedBytes(round.temp.wi), riBytes)
 
-	// store message pieces
+	round.temp.c = encodedBytesToBigInt(&lambdaReduced)
 	round.temp.si = &localS
+	round.temp.r = encodedBytesToBigInt(&encodedR)
 
 	// broadcast si to other parties
-	r1msg := sign.NewSignRound3Message(round.PartyID(), encodedBytesToBigInt(&localS))
-	round.temp.signRound1Messages[i] = r1msg
-	round.out <- r1msg
+	common.Logger.Debugf("P[%d]: round_2 broadcast", i)
+	r2msg := sign.NewSignRound2Message(round.PartyID(), encodedBytesToBigInt(&localS))
+	round.temp.signRound1Messages[i] = r2msg
+	round.out <- r2msg
 
 	return nil
 }
@@ -104,7 +164,7 @@ func (round *round1) Update() (bool, *tss.Error) {
 }
 
 func (round *round1) CanAccept(msg tss.ParsedMessage) bool {
-	if _, ok := msg.Content().(*sign.SignRound3Message); ok {
+	if _, ok := msg.Content().(*sign.SignRound2Message); ok {
 		return msg.IsBroadcast()
 	}
 	return false
@@ -121,6 +181,7 @@ func (round *round1) prepare() error {
 
 	if !round.isThreshold {
 		round.temp.wi = round.key.PrivXi
+		round.temp.bigWs = round.key.PubXj
 		round.temp.pubW = round.key.Pubkey
 	} else {
 		privXi := round.key.PrivXi
@@ -131,12 +192,13 @@ func (round *round1) prepare() error {
 			return fmt.Errorf("t+1=%d is not satisfied by the key count of %d", round.Threshold()+1, len(ks))
 		}
 
-		wi, _, pubKey, err := protocols.PrepareForSigning(round.Params().EC(), i, len(ks), privXi, ks, pubXjs)
+		wi, bigWs, pubKey, err := protocols.PrepareForSigning(round.Params().EC(), i, len(ks), privXi, ks, pubXjs)
 		if err != nil {
 			return err
 		}
 
 		round.temp.wi = wi
+		round.temp.bigWs = bigWs
 		round.temp.pubW = pubKey
 	}
 	return nil
