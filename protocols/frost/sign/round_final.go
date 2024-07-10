@@ -41,7 +41,7 @@ func (round *finalization) Start() *tss.Error {
 		ziGx, ziGy := round.EC().ScalarBaseMult(zi.Bytes())
 		ziG := crypto.NewECPointNoCurveCheck(round.EC(), ziGx, ziGy)
 
-		tmp := round.temp.bigWs[j].ScalarMult(round.temp.c)
+		tmp := round.key.PubXj[j].ScalarMult(round.temp.c)
 		tmp, err := tmp.Add(round.temp.Rj[j])
 		if err != nil {
 			return round.WrapError(fmt.Errorf("err: Rj + c * Xj: %s", err.Error()), Pj)
@@ -73,8 +73,8 @@ func (round *finalization) Start() *tss.Error {
 
 	pk := edwards.PublicKey{
 		Curve: round.Params().EC(),
-		X:     round.temp.pubW.X(),
-		Y:     round.temp.pubW.Y(),
+		X:     round.key.Pubkey.X(),
+		Y:     round.key.Pubkey.Y(),
 	}
 
 	ok := edwards.Verify(&pk, round.data.M, round.temp.r, s)

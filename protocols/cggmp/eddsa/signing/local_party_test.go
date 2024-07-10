@@ -60,12 +60,15 @@ func TestE2ENonThresholdConcurrent(t *testing.T) {
 	endCh := make(chan *common.SignatureData, len(signPIDs))
 
 	updater := test.SharedPartyUpdater
-
 	msg := big.NewInt(200)
+	path := "0/1/2/2/10"
+
 	// init the parties
 	for i := 0; i < len(signPIDs); i++ {
 		params := tss.NewParameters(tss.Edwards(), p2pCtx, signPIDs[i], len(signPIDs), threshold)
-		P := NewLocalParty(false, msg, params, keys[i], pres[i], outCh, endCh).(*LocalParty)
+		party, err := NewLocalParty(msg, false, params, path, keys[i], pres[i], outCh, endCh)
+		assert.NoError(t, err)
+		P := party.(*LocalParty)
 		parties = append(parties, P)
 
 		go func(P *LocalParty) {
@@ -169,13 +172,17 @@ func TestE2EThresholdConcurrent(t *testing.T) {
 	endCh := make(chan *common.SignatureData, len(signPIDs))
 
 	updater := test.SharedPartyUpdater
-
 	msg, _ := hex.DecodeString("00f163ee51bcaeff9cdff5e0e3c1a646abd19885fffbab0b3b4236e0cf95c9f5")
+	path := "0/1/2/2/10"
+
 	// init the parties
 	for i := 0; i < len(signPIDs); i++ {
 		params := tss.NewParameters(tss.Edwards(), p2pCtx, signPIDs[i], len(signPIDs), threshold)
-		P := NewLocalParty(true, new(big.Int).SetBytes(msg), params, keys[i], pres[i], outCh, endCh, len(msg)).(*LocalParty)
+		party, err := NewLocalParty(new(big.Int).SetBytes(msg), true, params, path, keys[i], pres[i], outCh, endCh, len(msg))
+		assert.NoError(t, err)
+		P := party.(*LocalParty)
 		parties = append(parties, P)
+
 		go func(P *LocalParty) {
 			if err := P.Start(); err != nil {
 				errCh <- err

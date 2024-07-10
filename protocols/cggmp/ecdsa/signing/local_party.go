@@ -1,7 +1,6 @@
 package signing
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 
@@ -23,7 +22,7 @@ type (
 		*tss.BaseParty
 		params *tss.Parameters
 
-		keys keygen.LocalPartySaveData
+		key  keygen.LocalPartySaveData
 		pre  presign.LocalPartySaveData
 		temp localTempData
 		data *common.SignatureData
@@ -40,16 +39,13 @@ type (
 	localTempData struct {
 		localMessageStore
 
-		isThreshold bool
-		msg         *big.Int
-
-		wi   *big.Int
-		pubW *crypto.ECPoint
+		isThreshold  bool
+		msg          *big.Int
+		fullBytesLen int
 
 		// round 1
-		fullBytesLen int
-		Gamma        *crypto.ECPoint
-		si           *big.Int
+		Gamma *crypto.ECPoint
+		si    *big.Int
 
 		ssid      []byte
 		ssidNonce *big.Int
@@ -57,21 +53,34 @@ type (
 )
 
 func NewLocalParty(
-	isThreshold bool,
 	msg *big.Int,
+	isThreshold bool,
 	params *tss.Parameters,
+	path string,
 	key keygen.LocalPartySaveData,
 	pre presign.LocalPartySaveData,
 	out chan<- tss.Message,
 	end chan<- *common.SignatureData,
 	fullBytesLen ...int,
-) tss.Party {
+) (tss.Party, error) {
+	key, err := keygen.BuildLocalSaveDataSubset(key, params.Parties().IDs())
+	if err != nil {
+		return nil, err
+	}
+	pre, err = presign.BuildLocalSaveDataSubset(pre, params.Parties().IDs())
+	if err != nil {
+		return nil, err
+	}
+	err = PrepareForSigning(&key, &pre, path, isThreshold, params.Threshold())
+	if err != nil {
+		return nil, err
+	}
 	partyCount := len(params.Parties().IDs())
 	p := &LocalParty{
 		BaseParty: new(tss.BaseParty),
 		params:    params,
-		keys:      keygen.BuildLocalSaveDataSubset(key, params.Parties().IDs()),
-		pre:       presign.BuildLocalSaveDataSubset(pre, params.Parties().IDs()),
+		key:       key,
+		pre:       pre,
 		temp:      localTempData{},
 		data:      &common.SignatureData{},
 		out:       out,
@@ -88,24 +97,15 @@ func NewLocalParty(
 		p.temp.fullBytesLen = 0
 	}
 	p.temp.isThreshold = isThreshold
-	return p
+	return p, nil
 }
 
 func (p *LocalParty) FirstRound() tss.Round {
-	return newRound1(p.temp.isThreshold, p.params, &p.keys, &p.pre, p.data, &p.temp, p.out, p.end)
+	return newRound1(p.temp.isThreshold, p.params, &p.key, &p.pre, p.data, &p.temp, p.out, p.end)
 }
 
 func (p *LocalParty) Start() *tss.Error {
-	return tss.BaseStart(p, TaskName, func(round tss.Round) *tss.Error {
-		round1, ok := round.(*round1)
-		if !ok {
-			return round.WrapError(errors.New("unable to Start(). party is in an unexpected round"))
-		}
-		if err := round1.prepare(); err != nil {
-			return round.WrapError(err)
-		}
-		return nil
-	})
+	return tss.BaseStart(p, TaskName)
 }
 
 func (p *LocalParty) Update(msg tss.ParsedMessage) (ok bool, err *tss.Error) {

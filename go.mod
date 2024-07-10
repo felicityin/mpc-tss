@@ -2,18 +2,18 @@ module github.com/felicityin/mpc-tss
 
 go 1.18
 
-//replace github.com/btcsuite/btcutil v0.0.0-20191219182022-e17c9730c422 => github.com/btcsuite/btcd/btcutil v1.1.3
-replace github.com/btcsuite/btcutil/hdkeychain v0.0.0-20191219182022-e17c9730c422 => github.com/btcsuite/btcd/btcuti/hdkeychain v1.1.3
+replace github.com/agl/ed25519 => github.com/binance-chain/edwards25519 v0.0.0-20200305024217-f36fc4b53d43
 
-//replace github.com/btcsuite/btcd/btcec v0.0.0-20191219182022-e17c9730c422 => github.com/btcsuite/btcd/btcec/v2 v2.2.1
-replace github.com/btcsuite/btcd/btcec => ./package/github.com/btcsuite/btcd/btcec/v1
+replace github.com/btcsuite/btcutil => github.com/btcsuite/btcd/btcutil v1.1.5
 
-replace github.com/btcsuite/btcd/btcec/v2 => ./package/github.com/btcsuite/btcd/btcec/v2
+replace github.com/btcsuite/btcd/btcec => github.com/btcsuite/btcd/btcec/v2 v2.2.1
 
 require (
 	github.com/agl/ed25519 v0.0.0-20200225211852-fd4d107ace12
+	github.com/btcsuite/btcd v0.23.5-0.20231215221805-96c9fd8078fd
 	github.com/btcsuite/btcd/btcec v0.0.0-00010101000000-000000000000
-	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
+	github.com/btcsuite/btcd/btcec/v2 v2.3.2
+	github.com/btcsuite/btcutil v1.0.2
 	github.com/decred/dcrd/dcrec/edwards/v2 v2.0.3
 	github.com/golang/protobuf v1.5.3
 	github.com/ipfs/go-log v1.0.4
@@ -24,11 +24,11 @@ require (
 	google.golang.org/protobuf v1.31.0
 )
 
-replace github.com/agl/ed25519 => github.com/binance-chain/edwards25519 v0.0.0-20200305024217-f36fc4b53d43
-
 require (
 	github.com/BurntSushi/toml v1.3.2 // indirect
+	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/ipfs/go-log/v2 v2.1.1 // indirect

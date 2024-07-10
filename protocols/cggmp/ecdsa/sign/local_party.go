@@ -1,7 +1,6 @@
 package sign
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 
@@ -9,6 +8,7 @@ import (
 	"github.com/felicityin/mpc-tss/crypto"
 	"github.com/felicityin/mpc-tss/protocols/cggmp/auxiliary"
 	"github.com/felicityin/mpc-tss/protocols/cggmp/keygen"
+	"github.com/felicityin/mpc-tss/protocols/utils"
 	"github.com/felicityin/mpc-tss/tss"
 )
 
@@ -46,10 +46,6 @@ type (
 		msg         *big.Int
 		isThreshold bool
 
-		wi    *big.Int
-		bigWs []*crypto.ECPoint
-		pubW  *crypto.ECPoint
-
 		// round 1
 		k                *big.Int
 		gamma            *big.Int
@@ -80,20 +76,29 @@ type (
 )
 
 func NewLocalParty(
-	isThreshold bool,
 	msg *big.Int,
+	isThreshold bool,
 	params *tss.Parameters,
+	path string,
 	key keygen.LocalPartySaveData,
 	aux auxiliary.LocalPartySaveData,
 	out chan<- tss.Message,
 	end chan<- *common.SignatureData,
 	fullBytesLen ...int,
-) tss.Party {
+) (tss.Party, error) {
+	key, err := keygen.BuildLocalSaveDataSubset(key, params.Parties().IDs())
+	if err != nil {
+		return nil, err
+	}
+	err = utils.UpdateKeyForSigning(&key, path, isThreshold, params.Threshold())
+	if err != nil {
+		return nil, err
+	}
 	partyCount := len(params.Parties().IDs())
 	p := &LocalParty{
 		BaseParty: new(tss.BaseParty),
 		params:    params,
-		keys:      keygen.BuildLocalSaveDataSubset(key, params.Parties().IDs()),
+		keys:      key,
 		auxs:      aux,
 		temp:      localTempData{},
 		data:      &common.SignatureData{},
@@ -119,7 +124,7 @@ func NewLocalParty(
 	p.temp.gammaCiphertexts = make([]*big.Int, partyCount)
 	p.temp.beta = make([]*big.Int, partyCount)
 	p.temp.betaHat = make([]*big.Int, partyCount)
-	return p
+	return p, nil
 }
 
 func (p *LocalParty) FirstRound() tss.Round {
@@ -127,16 +132,7 @@ func (p *LocalParty) FirstRound() tss.Round {
 }
 
 func (p *LocalParty) Start() *tss.Error {
-	return tss.BaseStart(p, TaskName, func(round tss.Round) *tss.Error {
-		round1, ok := round.(*round1)
-		if !ok {
-			return round.WrapError(errors.New("unable to Start(). party is in an unexpected round"))
-		}
-		if err := round1.prepare(); err != nil {
-			return round.WrapError(err)
-		}
-		return nil
-	})
+	return tss.BaseStart(p, TaskName)
 }
 
 func (p *LocalParty) Update(msg tss.ParsedMessage) (ok bool, err *tss.Error) {

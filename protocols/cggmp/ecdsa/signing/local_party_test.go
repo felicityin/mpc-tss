@@ -62,11 +62,14 @@ func TestE2ENonThresholdConcurrent(t *testing.T) {
 
 	updater := test.SharedPartyUpdater
 	msg := big.NewInt(42)
+	path := "0/1/2/2/10"
 
 	// init the parties
 	for i := 0; i < len(signPIDs); i++ {
 		params := tss.NewParameters(tss.S256(), p2pCtx, signPIDs[i], len(signPIDs), threshold)
-		P := NewLocalParty(false, msg, params, keys[i], pres[i], outCh, endCh).(*LocalParty)
+		party, err := NewLocalParty(msg, false, params, path, keys[i], pres[i], outCh, endCh)
+		assert.NoError(t, err)
+		P := party.(*LocalParty)
 		parties = append(parties, P)
 
 		go func(P *LocalParty) {
@@ -124,8 +127,8 @@ SIGN:
 				// BEGIN ECDSA verify
 				pk := ecdsa.PublicKey{
 					Curve: tss.S256(),
-					X:     parties[0].temp.pubW.X(),
-					Y:     parties[0].temp.pubW.Y(),
+					X:     parties[0].key.Pubkey.X(),
+					Y:     parties[0].key.Pubkey.Y(),
 				}
 				ok := ecdsa.Verify(&pk, msg.Bytes(), R.X(), sumS)
 				assert.True(t, ok, "ecdsa verify must pass")
@@ -159,13 +162,17 @@ func TestE2EThresholdConcurrent(t *testing.T) {
 	endCh := make(chan *common.SignatureData, len(signPIDs))
 
 	updater := test.SharedPartyUpdater
-
 	msg, _ := hex.DecodeString("00f163ee51bcaeff9cdff5e0e3c1a646abd19885fffbab0b3b4236e0cf95c9f5")
+	path := "0/1/2/2/10"
+
 	// init the parties
 	for i := 0; i < len(signPIDs); i++ {
 		params := tss.NewParameters(tss.S256(), p2pCtx, signPIDs[i], len(signPIDs), threshold)
-		P := NewLocalParty(true, new(big.Int).SetBytes(msg), params, keys[i], pres[i], outCh, endCh, len(msg)).(*LocalParty)
+		party, err := NewLocalParty(new(big.Int).SetBytes(msg), false, params, path, keys[i], pres[i], outCh, endCh)
+		assert.NoError(t, err)
+		P := party.(*LocalParty)
 		parties = append(parties, P)
+
 		go func(P *LocalParty) {
 			if err := P.Start(); err != nil {
 				errCh <- err
@@ -220,8 +227,8 @@ SIGN:
 				// BEGIN ECDSA verify
 				pk := ecdsa.PublicKey{
 					Curve: tss.S256(),
-					X:     parties[0].temp.pubW.X(),
-					Y:     parties[0].temp.pubW.Y(),
+					X:     parties[0].key.Pubkey.X(),
+					Y:     parties[0].key.Pubkey.Y(),
 				}
 				ok := ecdsa.Verify(&pk, msg, R.X(), sumS)
 				assert.True(t, ok, "ecdsa verify must pass")

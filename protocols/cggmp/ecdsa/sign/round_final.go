@@ -72,8 +72,8 @@ func (round *finalization) Start() *tss.Error {
 
 	pk := ecdsa.PublicKey{
 		Curve: round.Params().EC(),
-		X:     round.temp.pubW.X(),
-		Y:     round.temp.pubW.Y(),
+		X:     round.key.Pubkey.X(),
+		Y:     round.key.Pubkey.Y(),
 	}
 
 	ok := ecdsa.Verify(&pk, round.data.M, round.temp.R.X(), sumS)

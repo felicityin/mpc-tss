@@ -65,13 +65,17 @@ func NewLocalParty(
 	out chan<- tss.Message,
 	end chan<- *LocalPartySaveData,
 	fullBytesLen ...int,
-) tss.Party {
+) (tss.Party, error) {
+	key, err := keygen.BuildLocalSaveDataSubset(key, params.Parties().IDs())
+	if err != nil {
+		return nil, err
+	}
 	partyCount := len(params.Parties().IDs())
 	data := NewLocalPartySaveData(partyCount)
 	p := &LocalParty{
 		BaseParty: new(tss.BaseParty),
 		params:    params,
-		keys:      keygen.BuildLocalSaveDataSubset(key, params.Parties().IDs()),
+		keys:      key,
 		auxs:      aux,
 		temp:      localTempData{},
 		data:      data,
@@ -85,7 +89,7 @@ func NewLocalParty(
 
 	p.temp.isThreshold = isThreshold
 	p.temp.kCiphertexts = make([]*big.Int, partyCount)
-	return p
+	return p, nil
 }
 
 func (p *LocalParty) FirstRound() tss.Round {

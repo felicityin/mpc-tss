@@ -73,7 +73,7 @@ func (round *round3) Start() *tss.Error {
 	// compute lambda
 	var encodedR [32]byte
 	R.ToBytes(&encodedR)
-	encodedPubKey := ecPointToEncodedBytes(round.temp.pubW.X(), round.temp.pubW.Y())
+	encodedPubKey := ecPointToEncodedBytes(round.key.Pubkey.X(), round.key.Pubkey.Y())
 
 	// h = hash512(R || X || M)
 	h := sha512.New()
@@ -95,7 +95,7 @@ func (round *round3) Start() *tss.Error {
 
 	// compute si
 	var localS [32]byte
-	edwards25519.ScMulAdd(&localS, &lambdaReduced, bigIntToEncodedBytes(round.temp.wi), riBytes)
+	edwards25519.ScMulAdd(&localS, &lambdaReduced, bigIntToEncodedBytes(round.key.PrivXi), riBytes)
 
 	// store r3 message pieces
 	round.temp.si = &localS
