@@ -63,9 +63,11 @@ func TestE2ENonThresholdConcurrent(t *testing.T) {
 	// init the parties
 	for i := 0; i < len(signPIDs); i++ {
 		params := tss.NewParameters(tss.Edwards(), p2pCtx, signPIDs[i], len(signPIDs), threshold)
-
-		P := NewLocalParty(false, params, keys[i], auxs[i], outCh, endCh).(*LocalParty)
+		party, err := NewLocalParty(false, params, keys[i], auxs[i], outCh, endCh)
+		assert.NoError(t, err)
+		P := party.(*LocalParty)
 		parties = append(parties, P)
+
 		go func(P *LocalParty) {
 			if err := P.Start(); err != nil {
 				errCh <- err
@@ -140,8 +142,11 @@ func TestE2EThresholdConcurrent(t *testing.T) {
 	// init the parties
 	for i := 0; i < len(signPIDs); i++ {
 		params := tss.NewParameters(tss.Edwards(), p2pCtx, signPIDs[i], len(signPIDs), threshold)
-		P := NewLocalParty(true, params, keys[i], auxs[i], outCh, endCh).(*LocalParty)
+		party, err := NewLocalParty(false, params, keys[i], auxs[i], outCh, endCh)
+		assert.NoError(t, err)
+		P := party.(*LocalParty)
 		parties = append(parties, P)
+
 		go func(P *LocalParty) {
 			if err := P.Start(); err != nil {
 				errCh <- err

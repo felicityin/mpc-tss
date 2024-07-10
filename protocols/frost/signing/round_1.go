@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/felicityin/mpc-tss/common"
-	"github.com/felicityin/mpc-tss/protocols"
 	"github.com/felicityin/mpc-tss/protocols/cggmp/keygen"
 	"github.com/felicityin/mpc-tss/protocols/frost/presign"
 	"github.com/felicityin/mpc-tss/protocols/frost/sign"
@@ -62,7 +61,7 @@ func (round *round1) Start() *tss.Error {
 			round.pre.DEs[j].E.Y().Bytes(),
 		)
 
-		B = append(B, round.temp.bigWs[j].X().Bytes()...)
+		B = append(B, round.key.PubXj[j].X().Bytes()...)
 		B = append(B, bs...)
 	}
 
@@ -111,7 +110,7 @@ func (round *round1) Start() *tss.Error {
 	var encodedR [32]byte
 	R.ToBytes(&encodedR)
 
-	encodedPubKey := ecPointToEncodedBytes(round.temp.pubW.X(), round.temp.pubW.Y())
+	encodedPubKey := ecPointToEncodedBytes(round.key.Pubkey.X(), round.key.Pubkey.Y())
 
 	// h = hash512(R || X || M)
 	h := sha512.New()
@@ -133,7 +132,7 @@ func (round *round1) Start() *tss.Error {
 
 	// compute si
 	var localS [32]byte
-	edwards25519.ScMulAdd(&localS, &lambdaReduced, bigIntToEncodedBytes(round.temp.wi), riBytes)
+	edwards25519.ScMulAdd(&localS, &lambdaReduced, bigIntToEncodedBytes(round.key.PrivXi), riBytes)
 
 	round.temp.c = encodedBytesToBigInt(&lambdaReduced)
 	round.temp.si = &localS
@@ -173,33 +172,4 @@ func (round *round1) CanAccept(msg tss.ParsedMessage) bool {
 func (round *round1) NextRound() tss.Round {
 	round.started = false
 	return &finalization{round}
-}
-
-// helper to call into PrepareForSigning()
-func (round *round1) prepare() error {
-	i := round.PartyID().Index
-
-	if !round.isThreshold {
-		round.temp.wi = round.key.PrivXi
-		round.temp.bigWs = round.key.PubXj
-		round.temp.pubW = round.key.Pubkey
-	} else {
-		privXi := round.key.PrivXi
-		ks := round.key.Ks
-		pubXjs := round.key.PubXj
-
-		if round.Threshold()+1 > len(ks) {
-			return fmt.Errorf("t+1=%d is not satisfied by the key count of %d", round.Threshold()+1, len(ks))
-		}
-
-		wi, bigWs, pubKey, err := protocols.PrepareForSigning(round.Params().EC(), i, len(ks), privXi, ks, pubXjs)
-		if err != nil {
-			return err
-		}
-
-		round.temp.wi = wi
-		round.temp.bigWs = bigWs
-		round.temp.pubW = pubKey
-	}
-	return nil
 }

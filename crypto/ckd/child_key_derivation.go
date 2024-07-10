@@ -4,7 +4,6 @@ package ckd
 
 import (
 	"bytes"
-	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -14,28 +13,24 @@ import (
 	"fmt"
 	"hash"
 	"math/big"
+	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/felicityin/mpc-tss/tss"
-
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcutil/base58"
 	"github.com/felicityin/mpc-tss/common"
 	"github.com/felicityin/mpc-tss/crypto"
-
-	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcutil/base58"
 	"golang.org/x/crypto/ripemd160"
 )
 
 type ExtendedKey struct {
-	PublicKey    ecdsa.PublicKey
-	DeducePubKey ecdsa.PublicKey
-	Depth        uint8
-	ChildIndex   uint32
-	PrivKey      []byte // 32 bytes
-	ChainCode    []byte // 32 bytes
-	ParentFP     []byte // parent fingerprint
-	Version      []byte
+	PublicKey  *crypto.ECPoint
+	Depth      uint8
+	ChildIndex uint32
+	ChainCode  []byte // 32 bytes
+	ParentFP   []byte // parent fingerprint
+	Version    []byte
 }
 
 // For more information about child key derivation see https://github.com/binance-chain/tss-lib/issues/104
@@ -78,7 +73,7 @@ func (k *ExtendedKey) String() string {
 	serializedBytes = append(serializedBytes, k.ParentFP...)
 	serializedBytes = append(serializedBytes, childNumBytes[:]...)
 	serializedBytes = append(serializedBytes, k.ChainCode...)
-	pubKeyBytes := serializeCompressed(k.PublicKey.X, k.PublicKey.Y)
+	pubKeyBytes := serializeCompressed(k.PublicKey.X(), k.PublicKey.Y())
 	serializedBytes = append(serializedBytes, pubKeyBytes...)
 
 	checkSum := doubleHashB(serializedBytes)[:4]
@@ -111,22 +106,23 @@ func NewExtendedKeyFromString(key string, curve elliptic.Curve) (*ExtendedKey, e
 	chainCode := payload[13:45]
 	keyData := payload[45:78]
 
-	var pubKey ecdsa.PublicKey
+	var pubKey *crypto.ECPoint
+	var err error
 
 	if c, ok := curve.(*btcec.KoblitzCurve); ok {
-		// Ensure the public key parses correctly and is actually on the
-		// secp256k1 curve.
-		pk, err := btcec.ParsePubKey(keyData, c)
+		pk, err := btcec.ParsePubKey(keyData)
 		if err != nil {
 			return nil, err
 		}
-		pubKey = ecdsa.PublicKey(*pk)
+		pubKey, err = crypto.NewECPoint(c, pk.X(), pk.Y())
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		px, py := elliptic.Unmarshal(curve, keyData)
-		pubKey = ecdsa.PublicKey{
-			Curve: curve,
-			X:     px,
-			Y:     py,
+		pubKey, err = crypto.NewECPoint(curve, px, py)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -186,6 +182,33 @@ func serializeCompressed(publicKeyX *big.Int, publicKeyY *big.Int) []byte {
 	return paddedAppend(b, 32, publicKeyX.Bytes())
 }
 
+func ConvertPath(path string) ([]uint32, error) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return []uint32{}, nil
+	}
+	var paths []uint32
+	parts := strings.Split(path, "/")
+	for i, part := range parts {
+		// do we have an apostrophe?
+		harden := part[len(part)-1:] == "'"
+		if harden {
+			part = part[:len(part)-1]
+		}
+		if i == 0 && regexp.MustCompile(`^[a-zA-Z]+$`).MatchString(part) {
+			fmt.Println(part)
+			continue
+		}
+		// harden == private derivation, else public derivation:
+		idx, err := strconv.ParseUint(part, 10, 32)
+		if err != nil {
+			return nil, fmt.Errorf("invalid BIP 32 path: %s", err)
+		}
+		paths = append(paths, uint32(idx))
+	}
+	return paths, nil
+}
+
 func DeriveChildKeyFromHierarchy(indicesHierarchy []uint32, pk *ExtendedKey, mod *big.Int, curve elliptic.Curve) (*big.Int, *ExtendedKey, error) {
 	var k = pk
 	var err error
@@ -194,7 +217,7 @@ func DeriveChildKeyFromHierarchy(indicesHierarchy []uint32, pk *ExtendedKey, mod
 	ilNum := big.NewInt(0)
 	for index := range indicesHierarchy {
 		ilNumOld := ilNum
-		ilNum, childKey, err = DeriveChildKey(indicesHierarchy[index], false, k, curve)
+		ilNum, childKey, err = DeriveChildKey(indicesHierarchy[index], k, curve)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -206,7 +229,7 @@ func DeriveChildKeyFromHierarchy(indicesHierarchy []uint32, pk *ExtendedKey, mod
 
 // DeriveChildKey Derive a child key from the given parent key. The function returns "IL" ("I left"), per BIP-32 spec. It also
 // returns the derived child key.
-func DeriveChildKey(index uint32, harden bool, pk *ExtendedKey, curve elliptic.Curve) (*big.Int, *ExtendedKey, error) {
+func DeriveChildKey(index uint32, pk *ExtendedKey, curve elliptic.Curve) (*big.Int, *ExtendedKey, error) {
 	if index >= HardenedKeyStart {
 		return nil, nil, errors.New("the index must be non-hardened")
 	}
@@ -214,35 +237,13 @@ func DeriveChildKey(index uint32, harden bool, pk *ExtendedKey, curve elliptic.C
 		return nil, nil, errors.New("cannot derive key beyond max depth")
 	}
 
-	cryptoPk, err := crypto.NewECPoint(curve, pk.PublicKey.X, pk.PublicKey.Y)
-	if err != nil {
-		common.Logger.Error("error getting pubkey from extendedkey")
-		fmt.Errorf("error getting pubkey from extendedkey")
-		return nil, nil, err
-	}
-	deducePk, err := crypto.NewECPoint(curve, pk.DeducePubKey.X, pk.DeducePubKey.Y)
-	if err != nil {
-		common.Logger.Error("error getting deduce pubkey from extendedkey")
-		fmt.Errorf("error getting deduce pubkey from extendedkey")
-		return nil, nil, err
-	}
+	cryptoPk := pk.PublicKey
 
-	// this can't return an error:
-	pkPublicKeyBytes := serializeCompressed(pk.DeducePubKey.X, pk.DeducePubKey.Y)
-	var data []byte
-	if harden {
-		index = index | 0x80000000
-		data = append([]byte{byte(0)}, pk.PrivKey[:]...)
-	} else {
-		data = pkPublicKeyBytes
+	pkPublicKeyBytes := serializeCompressed(pk.PublicKey.X(), pk.PublicKey.Y())
 
-		/* By using btcec, we can remove the dependency on tendermint/crypto/secp256k1
-		pubkey := secp256k1.PrivKeySecp256k1(privKeyBytes).PubKey()
-		public := pubkey.(secp256k1.PubKeySecp256k1)
-		data = public[:]
-		*/
-	}
-	data = append(data, uint32ToBytes(index)...)
+	data := make([]byte, 37)
+	copy(data, pkPublicKeyBytes)
+	binary.BigEndian.PutUint32(data[33:], index)
 
 	// I = HMAC-SHA512(Key = chainCode, Data=data)
 	hmac512 := hmac.New(sha512.New, pk.ChainCode)
@@ -251,7 +252,9 @@ func DeriveChildKey(index uint32, harden bool, pk *ExtendedKey, curve elliptic.C
 	il := ilr[:32]
 	childChainCode := ilr[32:]
 	ilNum := new(big.Int).SetBytes(il)
+	ilNum = ilNum.Mod(ilNum, curve.Params().N)
 
+	var err error
 	if ilNum.Cmp(curve.Params().N) >= 0 || ilNum.Sign() == 0 {
 		// falling outside of the valid range for curve private keys
 		err = errors.New("invalid derived key")
@@ -270,204 +273,14 @@ func DeriveChildKey(index uint32, harden bool, pk *ExtendedKey, curve elliptic.C
 		common.Logger.Error("error adding delta G to parent key")
 		return nil, nil, err
 	}
-	deduceCryptoPk, err := deducePk.Add(deltaG)
-	if err != nil {
-		common.Logger.Error("error adding delta G to parent key")
-		return nil, nil, err
-	}
-
-	privKey := big.NewInt(0).SetBytes(pk.PrivKey)
-	sInt := new(big.Int).Add(ilNum, privKey)
-	x := sInt.Mod(sInt, btcec.S256().N)
 
 	childPk := &ExtendedKey{
-		PrivKey:      x.Bytes(),
-		PublicKey:    *childCryptoPk.ToECDSAPubKey(),
-		DeducePubKey: *deduceCryptoPk.ToECDSAPubKey(),
-		Depth:        pk.Depth + 1,
-		ChildIndex:   index,
-		ChainCode:    childChainCode,
-		ParentFP:     hash160(pkPublicKeyBytes)[:4],
-		Version:      pk.Version,
+		PublicKey:  childCryptoPk,
+		Depth:      pk.Depth + 1,
+		ChildIndex: index,
+		ChainCode:  childChainCode,
+		ParentFP:   hash160(pkPublicKeyBytes)[:4],
+		Version:    pk.Version,
 	}
 	return ilNum, childPk, nil
-}
-
-// DeriveChildPubKey Derive a child public key from the given parent key. The function returns "IL" ("I left"), per BIP-32 spec. It also
-// returns the derived child public key.
-func DeriveChildPubKey(index uint32, pk *ExtendedKey, curve elliptic.Curve) (*big.Int, *ExtendedKey, error) {
-	if index >= HardenedKeyStart {
-		return nil, nil, errors.New("the index must be non-hardened")
-	}
-	if pk.Depth == maxDepth {
-		return nil, nil, errors.New("cannot derive key beyond max depth")
-	}
-
-	cryptoPk, err := crypto.NewECPoint(curve, pk.PublicKey.X, pk.PublicKey.Y)
-	if err != nil {
-		common.Logger.Error("error getting pubkey from extendedkey")
-		return nil, nil, err
-	}
-	deducePk, err := crypto.NewECPoint(curve, pk.DeducePubKey.X, pk.DeducePubKey.Y)
-	if err != nil {
-		common.Logger.Error("error getting deduce pubkey from extendedkey")
-		return nil, nil, err
-	}
-
-	// this can't return an error:
-	pkPublicKeyBytes := serializeCompressed(pk.DeducePubKey.X, pk.DeducePubKey.Y)
-	var data []byte
-	data = pkPublicKeyBytes
-
-	/* By using btcec, we can remove the dependency on tendermint/crypto/secp256k1
-	pubkey := secp256k1.PrivKeySecp256k1(privKeyBytes).PubKey()
-	public := pubkey.(secp256k1.PubKeySecp256k1)
-	data = public[:]
-	*/
-	data = append(data, uint32ToBytes(index)...)
-
-	// I = HMAC-SHA512(Key = chainCode, Data=data)
-	hmac512 := hmac.New(sha512.New, pk.ChainCode)
-	hmac512.Write(data)
-	ilr := hmac512.Sum(nil)
-	il := ilr[:32]
-	childChainCode := ilr[32:]
-	ilNum := new(big.Int).SetBytes(il)
-
-	if ilNum.Cmp(curve.Params().N) >= 0 || ilNum.Sign() == 0 {
-		// falling outside of the valid range for curve private keys
-		err = errors.New("invalid derived key")
-		common.Logger.Error("error deriving child key")
-		return nil, nil, err
-	}
-
-	deltaG := crypto.ScalarBaseMult(curve, ilNum)
-	if deltaG.X().Sign() == 0 || deltaG.Y().Sign() == 0 {
-		err = errors.New("invalid child")
-		common.Logger.Error("error invalid child")
-		return nil, nil, err
-	}
-	childCryptoPk, err := cryptoPk.Add(deltaG)
-	if err != nil {
-		common.Logger.Error("error adding delta G to parent key")
-		return nil, nil, err
-	}
-	deduceChildCryptoPk, err := deducePk.Add(deltaG)
-	if err != nil {
-		common.Logger.Error("error adding delta G to parent key")
-		return nil, nil, err
-	}
-
-	/*	privKey := big.NewInt(0).SetBytes(pk.PrivKey)     //we don't have the parent private key
-		sInt := new(big.Int).Add(ilNum, privKey)
-		x := sInt.Mod(sInt, btcec.S256().N)*/
-
-	childPk := &ExtendedKey{
-		PrivKey:      nil,
-		PublicKey:    *childCryptoPk.ToECDSAPubKey(),
-		DeducePubKey: *deduceChildCryptoPk.ToECDSAPubKey(),
-		Depth:        pk.Depth + 1,
-		ChildIndex:   index,
-		ChainCode:    childChainCode,
-		ParentFP:     hash160(pkPublicKeyBytes)[:4],
-		Version:      pk.Version,
-	}
-	return ilNum, childPk, nil
-}
-
-func uint32ToBytes(i uint32) []byte {
-	b := [4]byte{}
-	binary.BigEndian.PutUint32(b[:], i)
-	return b[:]
-}
-
-func NewExtendKey(privKey []byte, pubKeyPoint, deducePubkeyPoint *crypto.ECPoint, index uint32, depth uint8, chainCode []byte) *ExtendedKey {
-	var parentFP []byte
-	pkPublicKeyBytes := serializeCompressed(deducePubkeyPoint.X(), deducePubkeyPoint.Y())
-	parentFP = hash160(pkPublicKeyBytes)[:4]
-	return &ExtendedKey{
-		PrivKey:      privKey,
-		PublicKey:    *pubKeyPoint.ToECDSAPubKey(),
-		DeducePubKey: *deducePubkeyPoint.ToECDSAPubKey(),
-		Depth:        depth,
-		ChildIndex:   index,
-		ChainCode:    chainCode,
-		ParentFP:     parentFP,
-		Version:      []byte{0},
-	}
-}
-
-// DerivePrivateKeyForPath derives the private key by following the BIP 32/44 path from privKeyBytes,
-// using the given chainCode.
-func DerivePrivateKeyForPath(pk *ExtendedKey, path string) ([32]byte, []byte, error) {
-	extPk := pk
-	parts := strings.Split(path, "/")
-	if pk.Depth > 0 {
-		parts = parts[pk.Depth:]
-	}
-	for _, part := range parts {
-		// do we have an apostrophe?
-		harden := part[len(part)-1:] == "'"
-		if harden {
-			part = part[:len(part)-1]
-		}
-		// harden == private derivation, else public derivation:
-		idx, err := strconv.Atoi(part)
-		if err != nil {
-			return [32]byte{}, nil, fmt.Errorf("invalid BIP 32 path: %s", err)
-		}
-		if idx < 0 {
-			return [32]byte{}, nil, errors.New("invalid BIP 32 path: index negative ot too large")
-		}
-		_, extPk, err = DeriveChildKey(uint32(idx), harden, extPk, tss.S256())
-		if err != nil {
-			return [32]byte{}, nil, fmt.Errorf("DeriveChildKey error: %s", err)
-		}
-	}
-	var derivedKey [32]byte
-	childPrivKeyBytes := extPk.PrivKey
-	padLen := len(childPrivKeyBytes)
-	for ; padLen < 32; padLen++ {
-		childPrivKeyBytes = append([]byte{0}, childPrivKeyBytes...)
-	}
-	n := copy(derivedKey[:], childPrivKeyBytes[:])
-	if n != 32 || len(childPrivKeyBytes) != 32 {
-		return [32]byte{}, nil, fmt.Errorf("expected a (secp256k1) key of length 32, got length: %v", len(childPrivKeyBytes))
-	}
-	pubKeyBytes := serializeCompressed(extPk.PublicKey.X, extPk.PublicKey.Y)
-	return derivedKey, pubKeyBytes, nil
-}
-
-// DerivePublicKeyForPath derives the public key by following the BIP 32/44 path from privKeyBytes,
-// using the given chainCode.
-func DerivePublicKeyForPath(pk *ExtendedKey, path string) (*crypto.ECPoint, error) {
-	extPk := pk
-	parts := strings.Split(path, "/")
-	if pk.Depth > 0 {
-		parts = parts[pk.Depth:]
-	}
-	for _, part := range parts {
-		// do we have an apostrophe?
-		harden := part[len(part)-1:] == "'"
-		if harden {
-			return nil, fmt.Errorf("harden not suppored")
-		}
-		// harden == private derivation, else public derivation:
-		idx, err := strconv.Atoi(part)
-		if err != nil {
-			return nil, fmt.Errorf("invalid BIP 32 path: %s", err)
-		}
-		if idx < 0 {
-			return nil, errors.New("invalid BIP 32 path: index negative ot too large")
-		}
-		_, extPk, err = DeriveChildPubKey(uint32(idx), extPk, tss.S256())
-		if err != nil {
-			return nil, fmt.Errorf("invalid BIP 32 path: %s", err)
-		}
-	}
-	pubkeyPoint, err := crypto.NewECPoint(tss.S256(), extPk.PublicKey.X, extPk.PublicKey.Y)
-	if err != nil {
-		return nil, fmt.Errorf("invalid extPk.PublicKey: %v, err %v", extPk.PublicKey, err)
-	}
-	return pubkeyPoint, nil
 }

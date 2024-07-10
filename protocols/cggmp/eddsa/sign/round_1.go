@@ -2,13 +2,11 @@ package sign
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 
 	"github.com/felicityin/mpc-tss/common"
 	"github.com/felicityin/mpc-tss/crypto"
 	"github.com/felicityin/mpc-tss/crypto/encproof"
-	"github.com/felicityin/mpc-tss/protocols"
 	"github.com/felicityin/mpc-tss/protocols/cggmp/auxiliary"
 	"github.com/felicityin/mpc-tss/protocols/cggmp/keygen"
 	"github.com/felicityin/mpc-tss/tss"
@@ -143,33 +141,4 @@ func (round *round1) CanAccept(msg tss.ParsedMessage) bool {
 func (round *round1) NextRound() tss.Round {
 	round.started = false
 	return &round2{round}
-}
-
-// helper to call into PrepareForSigning()
-func (round *round1) prepare() error {
-	i := round.PartyID().Index
-
-	if !round.isThreshold {
-		round.temp.wi = round.key.PrivXi
-		round.temp.bigWs = round.key.PubXj
-		round.temp.pubW = round.key.Pubkey
-	} else {
-		privXi := round.key.PrivXi
-		ks := round.key.Ks
-		pubXjs := round.key.PubXj
-
-		if round.Threshold()+1 > len(ks) {
-			return fmt.Errorf("t+1=%d is not satisfied by the key count of %d", round.Threshold()+1, len(ks))
-		}
-
-		wi, bigWs, pubKey, err := protocols.PrepareForSigning(round.Params().EC(), i, len(ks), privXi, ks, pubXjs)
-		if err != nil {
-			return err
-		}
-
-		round.temp.wi = wi
-		round.temp.bigWs = bigWs
-		round.temp.pubW = pubKey
-	}
-	return nil
 }

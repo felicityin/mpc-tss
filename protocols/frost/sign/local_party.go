@@ -1,13 +1,13 @@
 package sign
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 
 	"github.com/felicityin/mpc-tss/common"
 	"github.com/felicityin/mpc-tss/crypto"
 	"github.com/felicityin/mpc-tss/protocols/cggmp/keygen"
+	"github.com/felicityin/mpc-tss/protocols/utils"
 	"github.com/felicityin/mpc-tss/tss"
 )
 
@@ -40,10 +40,6 @@ type (
 
 		isThreshold bool
 
-		wi    *big.Int
-		bigWs []*crypto.ECPoint
-		pubW  *crypto.ECPoint
-
 		m            *big.Int
 		r            *big.Int
 		fullBytesLen int
@@ -63,19 +59,30 @@ type (
 )
 
 func NewLocalParty(
-	isThreshold bool,
 	msg *big.Int,
+	isThreshold bool,
 	params *tss.Parameters,
+	path string,
 	key keygen.LocalPartySaveData,
 	out chan<- tss.Message,
 	end chan<- *common.SignatureData,
 	fullBytesLen ...int,
-) tss.Party {
+) (tss.Party, error) {
+	key, err := keygen.BuildLocalSaveDataSubset(key, params.Parties().IDs())
+	if err != nil {
+		return nil, err
+	}
+
+	err = utils.UpdateKeyForSigning(&key, path, isThreshold, params.Threshold())
+	if err != nil {
+		return nil, err
+	}
+
 	partyCount := len(params.Parties().IDs())
 	p := &LocalParty{
 		BaseParty: new(tss.BaseParty),
 		params:    params,
-		keys:      keygen.BuildLocalSaveDataSubset(key, params.Parties().IDs()),
+		keys:      key,
 		temp:      localTempData{},
 		data:      &common.SignatureData{},
 		out:       out,
@@ -94,7 +101,7 @@ func NewLocalParty(
 	}
 	p.temp.isThreshold = isThreshold
 	p.temp.Rj = make([]*crypto.ECPoint, partyCount)
-	return p
+	return p, nil
 }
 
 func (p *LocalParty) FirstRound() tss.Round {
@@ -102,16 +109,7 @@ func (p *LocalParty) FirstRound() tss.Round {
 }
 
 func (p *LocalParty) Start() *tss.Error {
-	return tss.BaseStart(p, TaskName, func(round tss.Round) *tss.Error {
-		round1, ok := round.(*round1)
-		if !ok {
-			return round.WrapError(errors.New("unable to Start(). party is in an unexpected round"))
-		}
-		if err := round1.prepare(); err != nil {
-			return round.WrapError(err)
-		}
-		return nil
-	})
+	return tss.BaseStart(p, TaskName)
 }
 
 func (p *LocalParty) Update(msg tss.ParsedMessage) (ok bool, err *tss.Error) {

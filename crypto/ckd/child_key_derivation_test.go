@@ -7,11 +7,19 @@
 package ckd_test
 
 import (
+	"crypto/elliptic"
+	"crypto/rand"
+	"math/big"
 	"testing"
 
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/decred/dcrd/dcrec/edwards/v2"
+	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/crypto"
+	"github.com/felicityin/mpc-tss/crypto/ckd"
 	. "github.com/felicityin/mpc-tss/crypto/ckd"
-
-	"github.com/btcsuite/btcd/btcec"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestPublicDerivation(t *testing.T) {
@@ -115,7 +123,7 @@ tests:
 
 		for _, childNum := range test.path {
 			var err error
-			_, extKey, err = DeriveChildKey(childNum, false, extKey, btcec.S256())
+			_, extKey, err = DeriveChildKey(childNum, extKey, btcec.S256())
 			if err != nil {
 				t.Errorf("err: %v", err)
 				continue tests
@@ -130,4 +138,120 @@ tests:
 			continue
 		}
 	}
+}
+
+func TestConvertPath(t *testing.T) {
+	tests := []struct {
+		path string
+		want []uint32
+	}{
+		{
+			path: "m",
+			want: []uint32{},
+		},
+		{
+			path: "m/0",
+			want: []uint32{0},
+		},
+		{
+			path: "m/0/1",
+			want: []uint32{0, 1},
+		},
+		{
+			path: "m/0/1/2",
+			want: []uint32{0, 1, 2},
+		},
+		{
+			path: " m/0/1/2/2",
+			want: []uint32{0, 1, 2, 2},
+		},
+		{
+			path: "m/0/1/2/2/1000000000",
+			want: []uint32{0, 1, 2, 2, 1000000000},
+		},
+		{
+			path: "0/1/2/2/1000000000",
+			want: []uint32{0, 1, 2, 2, 1000000000},
+		},
+	}
+
+	for _, test := range tests {
+		res, err := ConvertPath(test.path)
+		assert.NoError(t, err)
+
+		for i, p := range res {
+			if p != test.want[i] {
+				t.Errorf("invalid path: %s", test.path)
+			}
+		}
+	}
+
+	_, err := ConvertPath("11/a/23")
+	assert.Error(t, err)
+}
+
+func TestEddsaPublicDerivation(t *testing.T) {
+	prikey := common.GetRandomPositiveInt(rand.Reader, edwards.Edwards().N)
+	pubkey := crypto.ScalarBaseMult(edwards.Edwards(), prikey)
+
+	chainCode := make([]byte, 32)
+	max32b := new(big.Int).Lsh(new(big.Int).SetUint64(1), 256)
+	max32b = new(big.Int).Sub(max32b, new(big.Int).SetUint64(1))
+	fillBytes(common.GetRandomPositiveInt(rand.Reader, max32b), chainCode)
+
+	il, extendedChildPk, errorDerivation := derivingPubkeyFromPath(pubkey, chainCode, []uint32{12, 209, 3}, edwards.Edwards())
+	assert.NoErrorf(t, errorDerivation, "there should not be an error deriving the child public key")
+
+	keyDerivationDelta := il
+
+	childPrivkey := new(big.Int).Add(prikey, keyDerivationDelta)
+	childPrivkey.Mod(childPrivkey, edwards.Edwards().N)
+
+	sk, pk, err := edwards.PrivKeyFromScalar(common.PadToLengthBytesInPlace(childPrivkey.Bytes()[:], 32))
+	assert.NoError(t, err)
+	assert.Equal(t, pk.X, extendedChildPk.PublicKey.X())
+
+	data := big.NewInt(200).Bytes()
+
+	r, s, err := edwards.Sign(sk, data)
+	assert.NoError(t, err, "sign should not throw an error")
+
+	pubk := edwards.PublicKey{
+		Curve: edwards.Edwards(),
+		X:     extendedChildPk.PublicKey.X(),
+		Y:     extendedChildPk.PublicKey.Y(),
+	}
+	ok := edwards.Verify(&pubk, data, r, s)
+	assert.True(t, ok)
+	assert.NoError(t, err)
+}
+
+func derivingPubkeyFromPath(masterPub *crypto.ECPoint, chainCode []byte, path []uint32, ec elliptic.Curve) (*big.Int, *ckd.ExtendedKey, error) {
+	net := &chaincfg.MainNetParams
+	extendedParentPk := &ckd.ExtendedKey{
+		PublicKey:  masterPub,
+		Depth:      0,
+		ChildIndex: 0,
+		ChainCode:  chainCode[:],
+		ParentFP:   []byte{0x00, 0x00, 0x00, 0x00},
+		Version:    net.HDPrivateKeyID[:],
+	}
+
+	return ckd.DeriveChildKeyFromHierarchy(path, extendedParentPk, ec.Params().N, ec)
+}
+
+func fillBytes(x *big.Int, buf []byte) []byte {
+	b := x.Bytes()
+	if len(b) > len(buf) {
+		panic("buffer too small")
+	}
+	offset := len(buf) - len(b)
+	for i := range buf {
+		if i < offset {
+			buf[i] = 0
+		} else {
+			buf[i] = b[i-offset]
+		}
+	}
+	return buf
 }

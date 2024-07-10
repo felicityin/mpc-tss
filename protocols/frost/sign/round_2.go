@@ -37,7 +37,7 @@ func (round *round2) Start() *tss.Error {
 			return round.WrapError(fmt.Errorf("marshal round1 msg err: %s", err.Error()), Pj)
 		}
 
-		B = append(B, round.temp.bigWs[j].X().Bytes()...)
+		B = append(B, round.key.PubXj[j].X().Bytes()...)
 		B = append(B, bs...)
 	}
 
@@ -98,7 +98,7 @@ func (round *round2) Start() *tss.Error {
 	var encodedR [32]byte
 	R.ToBytes(&encodedR)
 
-	encodedPubKey := ecPointToEncodedBytes(round.temp.pubW.X(), round.temp.pubW.Y())
+	encodedPubKey := ecPointToEncodedBytes(round.key.Pubkey.X(), round.key.Pubkey.Y())
 
 	// h = hash512(R || X || M)
 	h := sha512.New()
@@ -120,7 +120,7 @@ func (round *round2) Start() *tss.Error {
 
 	// compute si
 	var localS [32]byte
-	edwards25519.ScMulAdd(&localS, &lambdaReduced, bigIntToEncodedBytes(round.temp.wi), riBytes)
+	edwards25519.ScMulAdd(&localS, &lambdaReduced, bigIntToEncodedBytes(round.key.PrivXi), riBytes)
 
 	round.temp.c = encodedBytesToBigInt(&lambdaReduced)
 	round.temp.si = &localS

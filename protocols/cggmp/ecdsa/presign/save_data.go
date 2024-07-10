@@ -3,6 +3,7 @@ package presign
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/felicityin/mpc-tss/common"
@@ -50,19 +51,21 @@ func (save LocalPartySaveData) OriginalIndex() (int, error) {
 }
 
 // BuildLocalSaveDataSubset re-creates the LocalPartySaveData to contain data for only the list of signing parties.
-func BuildLocalSaveDataSubset(sourceData LocalPartySaveData, sortedIDs tss.SortedPartyIDs) LocalPartySaveData {
+func BuildLocalSaveDataSubset(sourceData LocalPartySaveData, sortedIDs tss.SortedPartyIDs) (newData LocalPartySaveData, err error) {
 	keysToIndices := make(map[string]int, len(sourceData.Ks))
 	for j, kj := range sourceData.Ks {
 		keysToIndices[hex.EncodeToString(kj.Bytes())] = j
 	}
-	newData := NewLocalPartySaveData(sortedIDs.Len())
+	newData = NewLocalPartySaveData(sortedIDs.Len())
 	newData.LocalSecrets = sourceData.LocalSecrets
 	for j, id := range sortedIDs {
 		savedIdx, ok := keysToIndices[hex.EncodeToString(id.Key)]
 		if !ok {
-			common.Logger.Errorf("BuildLocalSaveDataSubset: unable to find a signer party in the local save data: %s", hex.EncodeToString(id.Key))
+			common.Logger.Errorf("unable to find a signer party in the presign local save data: %s", hex.EncodeToString(id.Key))
+			err = fmt.Errorf("unable to find a signer party in the presign local save data: %s", hex.EncodeToString(id.Key))
+			return
 		}
 		newData.Ks[j] = sourceData.Ks[savedIdx]
 	}
-	return newData
+	return newData, nil
 }

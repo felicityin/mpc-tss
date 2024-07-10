@@ -10,6 +10,7 @@ import (
 	"github.com/felicityin/mpc-tss/protocols/cggmp/eddsa/presign"
 	"github.com/felicityin/mpc-tss/protocols/cggmp/eddsa/sign"
 	"github.com/felicityin/mpc-tss/protocols/cggmp/keygen"
+	"github.com/felicityin/mpc-tss/protocols/utils"
 	"github.com/felicityin/mpc-tss/tss"
 )
 
@@ -55,21 +56,34 @@ type (
 )
 
 func NewLocalParty(
-	isThreshold bool,
 	msg *big.Int,
+	isThreshold bool,
 	params *tss.Parameters,
+	path string,
 	key keygen.LocalPartySaveData,
 	pre presign.LocalPartySaveData,
 	out chan<- tss.Message,
 	end chan<- *common.SignatureData,
 	fullBytesLen ...int,
-) tss.Party {
+) (tss.Party, error) {
+	key, err := keygen.BuildLocalSaveDataSubset(key, params.Parties().IDs())
+	if err != nil {
+		return nil, err
+	}
+	pre, err = presign.BuildLocalSaveDataSubset(pre, params.Parties().IDs())
+	if err != nil {
+		return nil, err
+	}
+	err = utils.UpdateKeyForSigning(&key, path, isThreshold, params.Threshold())
+	if err != nil {
+		return nil, err
+	}
 	partyCount := len(params.Parties().IDs())
 	p := &LocalParty{
 		BaseParty: new(tss.BaseParty),
 		params:    params,
-		keys:      keygen.BuildLocalSaveDataSubset(key, params.Parties().IDs()),
-		pres:      presign.BuildLocalSaveDataSubset(pre, params.Parties().IDs()),
+		keys:      key,
+		pres:      pre,
 		temp:      localTempData{},
 		data:      &common.SignatureData{},
 		out:       out,
@@ -86,7 +100,7 @@ func NewLocalParty(
 		p.temp.fullBytesLen = 0
 	}
 	p.temp.isThreshold = isThreshold
-	return p
+	return p, nil
 }
 
 func (p *LocalParty) FirstRound() tss.Round {

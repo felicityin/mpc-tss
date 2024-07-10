@@ -55,8 +55,8 @@ func (round *finalization) Start() *tss.Error {
 
 	pk := edwards.PublicKey{
 		Curve: round.Params().EC(),
-		X:     round.temp.pubW.X(),
-		Y:     round.temp.pubW.Y(),
+		X:     round.key.Pubkey.X(),
+		Y:     round.key.Pubkey.Y(),
 	}
 
 	ok := edwards.Verify(&pk, round.data.M, round.temp.r, s)

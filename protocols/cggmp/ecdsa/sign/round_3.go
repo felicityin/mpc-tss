@@ -68,7 +68,7 @@ func (round *round3) Start() *tss.Error {
 
 		if err = psiHatProof.Verify(
 			ProofParameter, contextJ, round.aux.PaillierPKs[i].N, round.aux.PedersenPKs[j].N, round.temp.kCiphertexts[i],
-			new(big.Int).SetBytes(r2msg.GetDHat()), new(big.Int).SetBytes(r2msg.GetFHat()), round.aux.PedersenPKs[i], round.temp.bigWs[j],
+			new(big.Int).SetBytes(r2msg.GetDHat()), new(big.Int).SetBytes(r2msg.GetFHat()), round.aux.PedersenPKs[i], round.key.PubXj[j],
 		); err != nil {
 			common.Logger.Errorf("[j: %d] failed to verify affg_hat proof: %s", j, err)
 			return round.WrapError(fmt.Errorf("failed to verify affg_hat proof: %s", err.Error()), Pj)
@@ -98,7 +98,7 @@ func (round *round3) Start() *tss.Error {
 	// δi = γi * ki + sum(αi,j + βi,j) mod q
 	delta := new(big.Int).Mul(round.temp.gamma, round.temp.k)
 	// χi = xi * ki + sum(α̂ i,j + β̂ i,j) mod q
-	chi := new(big.Int).Mul(round.temp.wi, round.temp.k)
+	chi := new(big.Int).Mul(round.key.PrivXi, round.temp.k)
 
 	// calculate δi, χi
 	for j := range round.Parties().IDs() {
