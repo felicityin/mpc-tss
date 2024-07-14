@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package legend.tsslib.crypto.facproof;
+package tsslib.crypto.facproof;
 
 option go_package = "crypto/facproof";
 

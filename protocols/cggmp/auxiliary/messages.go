@@ -11,6 +11,7 @@ import (
 	"github.com/felicityin/mpc-tss/crypto/facproof"
 	"github.com/felicityin/mpc-tss/crypto/modproof"
 	"github.com/felicityin/mpc-tss/crypto/paillier"
+	"github.com/felicityin/mpc-tss/crypto/prmproof"
 	"github.com/felicityin/mpc-tss/tss"
 )
 
@@ -98,8 +99,8 @@ func (m *AuxRound2Message) UnmarshalPedersenPK() *zkPaillier.PederssenOpenParame
 	}
 }
 
-func (m *AuxRound2Message) UnmarshalPrmProof() (*zkPaillier.RingPederssenParameterMessage, error) {
-	prmProof := &zkPaillier.RingPederssenParameterMessage{}
+func (m *AuxRound2Message) UnmarshalPrmProof() (*prmproof.RingPederssenParameterMessage, error) {
+	prmProof := &prmproof.RingPederssenParameterMessage{}
 	if err := proto.Unmarshal(m.GetPrmProof(), prmProof); err != nil {
 		return nil, err
 	}

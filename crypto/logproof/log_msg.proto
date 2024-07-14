@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package legend.tsslib.crypto.logroof;
+package tsslib.crypto.logroof;
 
 option go_package = "crypto/logproof";
 

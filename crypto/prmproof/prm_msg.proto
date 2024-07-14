@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package tsslib.crypto.prmroof;
+
+option go_package = "crypto/prmproof";
+
+message RingPederssenParameterMessage {
+    repeated bytes z = 1;
+    repeated bytes a = 2;
+    bytes n = 3;
+    bytes s = 4;
+    bytes t = 5;
+    bytes salt = 6;
+}

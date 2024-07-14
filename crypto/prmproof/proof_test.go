@@ -1,9 +1,9 @@
-package paillier
+package prmproof
 
 import (
 	"testing"
 
-	paillierzkproof "github.com/felicityin/mpc-tss/crypto/alice/zkproof/paillier"
+	"github.com/felicityin/mpc-tss/crypto/alice/paillier"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -11,19 +11,19 @@ import (
 func TestPaillierZkProof(t *testing.T) {
 	ssIDInfo := []byte("Mark HaHa")
 
-	paillierKey, err := NewPaillierSafePrime(2048)
+	paillierKey, err := paillier.NewPaillierSafePrime(2048)
 	assert.NoError(t, err)
 	ped, err := paillierKey.NewPedersenParameterByPaillier()
 	assert.NoError(t, err)
 
-	zkproof, err := paillierzkproof.NewRingPederssenParameterMessage(
+	zkproof, err := NewRingPederssenParameterMessage(
 		ssIDInfo,
 		ped.GetEulerValue(),
 		ped.PedersenOpenParameter.GetN(),
 		ped.PedersenOpenParameter.GetS(),
 		ped.PedersenOpenParameter.GetT(),
 		ped.Getlambda(),
-		80,
+		MINIMALCHALLENGE,
 	)
 
 	assert.NoError(t, err)

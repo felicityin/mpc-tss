@@ -8,7 +8,7 @@ import (
 
 	"github.com/felicityin/mpc-tss/common"
 	"github.com/felicityin/mpc-tss/crypto"
-	paillierzkproof "github.com/felicityin/mpc-tss/crypto/alice/zkproof/paillier"
+	"github.com/felicityin/mpc-tss/crypto/prmproof"
 	"github.com/felicityin/mpc-tss/tss"
 )
 
@@ -68,14 +68,14 @@ func (round *round1) Start() *tss.Error {
 
 	// Generate prm proof
 	contextI := append(round.temp.ssid, big.NewInt(int64(i)).Bytes()...)
-	prmProof, err := paillierzkproof.NewRingPederssenParameterMessage(
+	prmProof, err := prmproof.NewRingPederssenParameterMessage(
 		contextI,
 		pedersen.GetEulerValue(),
 		pedersen.PedersenOpenParameter.GetN(),
 		pedersen.PedersenOpenParameter.GetS(),
 		pedersen.PedersenOpenParameter.GetT(),
 		pedersen.Getlambda(),
-		paillierzkproof.MINIMALCHALLENGE,
+		prmproof.MINIMALCHALLENGE,
 	)
 	if err != nil {
 		return round.WrapError(fmt.Errorf("party: %d, generate prm proof error: %s", i, err.Error()))
