@@ -6,8 +6,8 @@ import (
 	"math/big"
 
 	"github.com/felicityin/mpc-tss/common"
-	paillierzkproof "github.com/felicityin/mpc-tss/crypto/alice/zkproof/paillier"
 	"github.com/felicityin/mpc-tss/crypto/paillier"
+	"github.com/felicityin/mpc-tss/crypto/prmproof"
 	"github.com/felicityin/mpc-tss/tss"
 )
 
@@ -38,7 +38,7 @@ type (
 	localTempData struct {
 		localMessageStore
 
-		prmProof *paillierzkproof.RingPederssenParameterMessage
+		prmProof *prmproof.RingPederssenParameterMessage
 
 		// Echo broadcast and random oracle data seed
 		srid []byte

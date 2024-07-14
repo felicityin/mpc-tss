@@ -9,9 +9,9 @@ import (
 
 	"github.com/felicityin/mpc-tss/common"
 	"github.com/felicityin/mpc-tss/crypto/alice/utils"
-	paillierzkproof "github.com/felicityin/mpc-tss/crypto/alice/zkproof/paillier"
 	"github.com/felicityin/mpc-tss/crypto/facproof"
 	"github.com/felicityin/mpc-tss/crypto/modproof"
+	"github.com/felicityin/mpc-tss/crypto/prmproof"
 	"github.com/felicityin/mpc-tss/tss"
 )
 
@@ -82,7 +82,7 @@ func (round *round3) Start() *tss.Error {
 
 	// Generate mod proof
 	modProof, err := modproof.NewPaillierBlumMessage(
-		round.temp.rho, round.save.PaillierSK.P, round.save.PaillierSK.Q, round.save.PedersenPKs[i].GetN(), paillierzkproof.MINIMALCHALLENGE,
+		round.temp.rho, round.save.PaillierSK.P, round.save.PaillierSK.Q, round.save.PedersenPKs[i].GetN(), modproof.MINIMALCHALLENGE,
 	)
 	if err != nil {
 		return round.WrapError(fmt.Errorf("party %d, calc mod proof failed: %s", i, err.Error()))
@@ -118,7 +118,7 @@ func (round *round3) Start() *tss.Error {
 	return nil
 }
 
-func (round *round3) verifyPrmPubkeys(j int, msg *paillierzkproof.RingPederssenParameterMessage) error {
+func (round *round3) verifyPrmPubkeys(j int, msg *prmproof.RingPederssenParameterMessage) error {
 	n := new(big.Int).SetBytes(msg.N)
 	s := new(big.Int).SetBytes(msg.S)
 	t := new(big.Int).SetBytes(msg.T)

@@ -19,8 +19,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	zKpaillier "github.com/felicityin/mpc-tss/crypto/alice/zkproof/paillier"
 )
 
 var (
@@ -32,13 +30,13 @@ var (
 
 func TestModProof(test *testing.T) {
 	// ok
-	zkproof, err := NewPaillierBlumMessage(ssIDInfo, p0, q0, n0, zKpaillier.MINIMALCHALLENGE)
+	zkproof, err := NewPaillierBlumMessage(ssIDInfo, p0, q0, n0, MINIMALCHALLENGE)
 	assert.NoError(test, err)
 	err = zkproof.Verify(ssIDInfo, n0)
 	assert.NoError(test, err)
 
 	// wrong p and q
-	zkproof, err = NewPaillierBlumMessage(ssIDInfo, big0, big0, n0, zKpaillier.MINIMALCHALLENGE)
+	zkproof, err = NewPaillierBlumMessage(ssIDInfo, big0, big0, n0, MINIMALCHALLENGE)
 	assert.Error(test, err)
 	assert.Empty(test, zkproof)
 }

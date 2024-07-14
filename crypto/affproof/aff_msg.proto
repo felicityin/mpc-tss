@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package legend.tsslib.crypto.affproof;
+package tsslib.crypto.affproof;
 
 option go_package = "crypto/affproof";
 
