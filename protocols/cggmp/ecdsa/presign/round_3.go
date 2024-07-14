@@ -3,6 +3,7 @@ package presign
 import (
 	"fmt"
 	"math/big"
+	sync "sync"
 
 	"github.com/pkg/errors"
 
@@ -27,6 +28,10 @@ func (round *round3) Start() *tss.Error {
 	// Γ = sum_j Γj
 	sumGamma := round.temp.Gamma
 
+	errChs := make(chan *tss.Error, (len(round.Parties().IDs())-1)*3)
+	wg := sync.WaitGroup{}
+	wg.Add((len(round.Parties().IDs()) - 1) * 2)
+
 	// verify received proofs
 	for j, Pj := range round.Parties().IDs() {
 		if j == i {
@@ -40,6 +45,7 @@ func (round *round3) Start() *tss.Error {
 		if err != nil {
 			return round.WrapError(err, Pj)
 		}
+
 		sumGamma, err = sumGamma.Add(Gamma)
 		if err != nil {
 			return round.WrapError(err, Pj)
@@ -52,28 +58,12 @@ func (round *round3) Start() *tss.Error {
 		}
 		common.Logger.Debugf("P[%d]: receive P[%d]'s affg proof", i, j)
 
-		if err = psiProof.Verify(
-			ProofParameter, contextJ, round.aux.PaillierPKs[i].N, round.aux.PedersenPKs[j].N, round.temp.kCiphertexts[i],
-			new(big.Int).SetBytes(r2msg.GetD()), new(big.Int).SetBytes(r2msg.GetF()), round.aux.PedersenPKs[i], Gamma,
-		); err != nil {
-			common.Logger.Errorf("[j: %d] failed to verify affg proof: %s", j, err)
-			return round.WrapError(fmt.Errorf("[j: %d] failed to verify affg proof: %s", j, err.Error()))
-		}
-
 		psiHatProof, err := r2msg.UnmarshalAffgHatProof()
 		if err != nil {
 			common.Logger.Errorf("[j: %d] failed to unmarshal affg_hat proof: %s", j, err.Error())
 			return round.WrapError(fmt.Errorf("[j: %d] failed to unmarshal affg_hat proof: %s", j, err.Error()))
 		}
 		common.Logger.Debugf("P[%d]: receive P[%d]'s affg_hat proof", i, j)
-
-		if err = psiHatProof.Verify(
-			ProofParameter, contextJ, round.aux.PaillierPKs[i].N, round.aux.PedersenPKs[j].N, round.temp.kCiphertexts[i],
-			new(big.Int).SetBytes(r2msg.GetDHat()), new(big.Int).SetBytes(r2msg.GetFHat()), round.aux.PedersenPKs[i], round.temp.bigWs[j],
-		); err != nil {
-			common.Logger.Errorf("[j: %d] failed to verify affg_hat proof: %s", j, err)
-			return round.WrapError(fmt.Errorf("failed to verify affg_hat proof: %s", err.Error()), Pj)
-		}
 
 		logProof, err := r2msg.UnmarshalLogProof()
 		if err != nil {
@@ -82,24 +72,57 @@ func (round *round3) Start() *tss.Error {
 		}
 		common.Logger.Debugf("P[%d]: receive P[%d]'s log proof", i, j)
 
-		if err := logProof.Verify(
-			ProofParameter, contextJ, round.temp.gammaCiphertexts[j], round.aux.PaillierPKs[j].N,
-			round.aux.PedersenPKs[i], Gamma, nil,
-		); err != nil {
-			common.Logger.Errorf("verify log proof failed: %s, party: %d", err, j)
-			return round.WrapError(fmt.Errorf("verify log proof failed: %s", err), Pj)
-		}
-		common.Logger.Debugf("P[%d]: verify P[%d]'s log proof ok", i, j)
+		go func(j int) {
+			defer wg.Done()
+
+			if err = psiProof.Verify(
+				ProofParameter, contextJ, round.aux.PaillierPKs[i].N, round.aux.PedersenPKs[j].N, round.temp.kCiphertexts[i],
+				new(big.Int).SetBytes(r2msg.GetD()), new(big.Int).SetBytes(r2msg.GetF()), round.aux.PedersenPKs[i], Gamma,
+			); err != nil {
+				common.Logger.Errorf("[j: %d] failed to verify affg proof: %s", j, err)
+				errChs <- round.WrapError(fmt.Errorf("[j: %d] failed to verify affg proof: %s", j, err.Error()))
+			}
+		}(j)
+
+		go func(j int) {
+			defer wg.Done()
+
+			if err = psiHatProof.Verify(
+				ProofParameter, contextJ, round.aux.PaillierPKs[i].N, round.aux.PedersenPKs[j].N, round.temp.kCiphertexts[i],
+				new(big.Int).SetBytes(r2msg.GetDHat()), new(big.Int).SetBytes(r2msg.GetFHat()), round.aux.PedersenPKs[i], round.key.PubXj[j],
+			); err != nil {
+				common.Logger.Errorf("[j: %d] failed to verify affg_hat proof: %s", j, err)
+				errChs <- round.WrapError(fmt.Errorf("failed to verify affg_hat proof: %s", err.Error()), Pj)
+			}
+
+			if err := logProof.Verify(
+				ProofParameter, contextJ, round.temp.gammaCiphertexts[j], round.aux.PaillierPKs[j].N,
+				round.aux.PedersenPKs[i], Gamma, nil,
+			); err != nil {
+				common.Logger.Errorf("verify log proof failed: %s, party: %d", err, j)
+				errChs <- round.WrapError(fmt.Errorf("verify log proof failed: %s", err), Pj)
+			}
+			common.Logger.Debugf("P[%d]: verify P[%d]'s log proof ok", i, j)
+		}(j)
 	}
 
-	round.temp.sumGamma = sumGamma
+	// Consume error channels; wait for goroutines
+	wg.Wait()
+	close(errChs)
+	culprits := make([]*tss.PartyID, 0, len(round.Parties().IDs()))
+	for err := range errChs {
+		culprits = append(culprits, err.Culprits()...)
+	}
+	if len(culprits) > 0 {
+		return round.WrapError(errors.New("failed to calculate affg proof"), culprits...)
+	}
 
 	// ∆i = Γ^ki
 	round.temp.Delta = sumGamma.ScalarMult(round.save.K)
 	// δi = γi * ki + sum(αi,j + βi,j) mod q
 	delta := new(big.Int).Mul(round.temp.gamma, round.save.K)
 	// χi = xi * ki + sum(α̂ i,j + β̂ i,j) mod q
-	chi := new(big.Int).Mul(round.temp.wi, round.save.K)
+	chi := new(big.Int).Mul(round.key.PrivXi, round.save.K)
 
 	// calculate δi, χi
 	for j := range round.Parties().IDs() {
@@ -130,6 +153,7 @@ func (round *round3) Start() *tss.Error {
 		chi.Mod(chi, round.EC().Params().N)
 	}
 
+	round.temp.sumGamma = sumGamma
 	round.temp.delta = delta
 	round.save.Chi = chi
 

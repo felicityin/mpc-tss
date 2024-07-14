@@ -99,7 +99,7 @@ func (round *round2) Start() *tss.Error {
 			// aff-g proof: M(prove, Πaff-g, (sid, i), (Iε, Jε, Dˆj,i, Kj, Fˆj,i, Xi); (xi, βˆi,j, sˆi,j, rˆi,j))
 			negBetaHat, countSigma, rhat, shat, Dhat, Fhat, psiHatProof, err := mta.MtaWithProofAff_g(
 				round.Rand(), contextI, round.aux.PedersenPKs[j], round.aux.PaillierPKs[i],
-				round.temp.kCiphertexts[j], round.temp.wi, round.temp.bigWs[i],
+				round.temp.kCiphertexts[j], round.key.PrivXi, round.key.PubXj[i],
 			)
 			Dhats[j], Fhats[j], psiHatProofs[j], round.temp.betaHat[j], _, _, _ = Dhat, Fhat, psiHatProof, negBetaHat, countSigma, rhat, shat
 			if err != nil {
