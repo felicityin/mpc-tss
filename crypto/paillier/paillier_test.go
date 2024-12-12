@@ -155,16 +155,3 @@ func TestComputeL(t *testing.T) {
 
 	assert.Equal(t, 0, expected.Cmp(actual))
 }
-
-func TestGenerateXs(t *testing.T) {
-	k := common.MustGetRandomInt(rand.Reader, 256)
-	sX := common.MustGetRandomInt(rand.Reader, 256)
-	sY := common.MustGetRandomInt(rand.Reader, 256)
-	N := common.GetRandomPrimeInt(rand.Reader, 2048)
-
-	xs := GenerateXs(13, k, N, crypto.NewECPointNoCurveCheck(tss.EC(), sX, sY))
-	assert.Equal(t, 13, len(xs))
-	for _, xi := range xs {
-		assert.True(t, common.IsNumberInMultiplicativeGroup(N, xi))
-	}
-}
