@@ -7,24 +7,22 @@
 package paillier_test
 
 import (
-	"context"
 	"crypto/rand"
+	"io"
 	"math/big"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/common/pool"
+	"github.com/felicityin/mpc-tss/common/sample"
 	"github.com/felicityin/mpc-tss/crypto"
 	. "github.com/felicityin/mpc-tss/crypto/paillier"
 	"github.com/felicityin/mpc-tss/tss"
 )
 
-// Using a modulus length of 2048 is recommended in the GG18 spec
-const (
-	testPaillierKeyLength = 2048
-)
+var big1 = big.NewInt(1)
 
 var (
 	privateKey *PrivateKey
@@ -36,12 +34,27 @@ func setUp(t *testing.T) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer cancel()
-
 	var err error
-	privateKey, publicKey, err = GenerateKeyPair(ctx, rand.Reader, testPaillierKeyLength)
+	privateKey, publicKey, err = GeneratePaillier(rand.Reader)
 	assert.NoError(t, err)
+}
+
+func GeneratePaillier(rand io.Reader) (*PrivateKey, *PublicKey, error) {
+	pl := pool.NewPool(0)
+	P, Q := sample.Paillier(rand, pl)
+	N := new(big.Int).Mul(P, Q)
+
+	// phiN = P-1 * Q-1
+	PMinus1, QMinus1 := new(big.Int).Sub(P, big1), new(big.Int).Sub(Q, big1)
+	phiN := new(big.Int).Mul(PMinus1, QMinus1)
+
+	// lambdaN = lcm(P−1, Q−1)
+	gcd := new(big.Int).GCD(nil, nil, PMinus1, QMinus1)
+	lambdaN := new(big.Int).Div(phiN, gcd)
+
+	publicKey := &PublicKey{N: N}
+	privateKey := &PrivateKey{PublicKey: *publicKey, LambdaN: lambdaN, PhiN: phiN, P: P, Q: Q}
+	return privateKey, publicKey, nil
 }
 
 func TestGenerateKeyPair(t *testing.T) {

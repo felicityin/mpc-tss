@@ -51,6 +51,7 @@ func (round *round4) Start() *tss.Error {
 	}
 
 	common.Logger.Infof("party: %d, round_4 save", i)
+	// common.Logger.Errorf("party: %d, round_4 save", len(round.save))
 	round.end <- round.save
 	return nil
 }

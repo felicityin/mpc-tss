@@ -8,7 +8,6 @@ import (
 	"errors"
 	"math"
 	"math/big"
-	sync "sync"
 
 	"github.com/felicityin/mpc-tss/common"
 	"github.com/felicityin/mpc-tss/crypto/alice/utils"
@@ -71,38 +70,38 @@ func NewPaillierBlumMessage(ssidInfo []byte, p *big.Int, q *big.Int, n *big.Int,
 	nInverEuler := new(big.Int).ModInverse(n, eulerValue)
 
 	errChs := make(chan error, numberzkProof*2)
-	wg := sync.WaitGroup{}
-	wg.Add(numberzkProof)
+	// wg := sync.WaitGroup{}
+	// wg.Add(numberzkProof)
 
 	for i := 0; i < numberzkProof; i++ {
-		go func(i int) {
-			defer wg.Done()
+		// go func(i int) {
+		// defer wg.Done()
 
-			salti, err := utils.GenRandomBytes(128)
-			if err != nil {
-				common.Logger.Errorf("%s", err.Error())
-				errChs <- err
-			}
-			// Challenges {yi in Z_N}_{i=1,...,m}.
-			yi, salti, err := computeyByRejectSampling(w, n, salti, ssidInfo)
-			if err != nil {
-				common.Logger.Errorf("%s", err.Error())
-				errChs <- err
-			}
-			zi := new(big.Int).Exp(yi, nInverEuler, n)
-			// Compute xi = yi^{1/4} mod N with yi=(-1)^ai*w^bi*yi mod N, where ai, bi in {0,1} such that xi is well-defined.
-			ai, bi, xi := get4thRootWithabValue(yi, w, p, q, n)
+		salti, err := utils.GenRandomBytes(128)
+		if err != nil {
+			common.Logger.Errorf("%s", err.Error())
+			errChs <- err
+		}
+		// Challenges {yi in Z_N}_{i=1,...,m}.
+		yi, salti, err := computeyByRejectSampling(w, n, salti, ssidInfo)
+		if err != nil {
+			common.Logger.Errorf("%s", err.Error())
+			errChs <- err
+		}
+		zi := new(big.Int).Exp(yi, nInverEuler, n)
+		// Compute xi = yi^{1/4} mod N with yi=(-1)^ai*w^bi*yi mod N, where ai, bi in {0,1} such that xi is well-defined.
+		ai, bi, xi := get4thRootWithabValue(yi, w, p, q, n)
 
-			x[i] = xi.Bytes()
-			a[i] = ai.Bytes()
-			b[i] = bi.Bytes()
-			z[i] = zi.Bytes()
-			salt[i] = salti
-		}(i)
+		x[i] = xi.Bytes()
+		a[i] = ai.Bytes()
+		b[i] = bi.Bytes()
+		z[i] = zi.Bytes()
+		salt[i] = salti
+		// }(i)
 	}
 
 	// Consume error channels; wait for goroutines
-	wg.Wait()
+	// wg.Wait()
 	close(errChs)
 	for err := range errChs {
 		return nil, err
@@ -141,63 +140,63 @@ func (msg *PaillierBlumMessage) Verify(ssidInfo []byte, n *big.Int) error {
 	}
 
 	errChs := make(chan error, len(a)*6)
-	wg := sync.WaitGroup{}
-	wg.Add(len(a))
+	// wg := sync.WaitGroup{}
+	// wg.Add(len(a))
 
 	for i := 0; i < len(a); i++ {
-		go func(i int) {
-			defer wg.Done()
+		// go func(i int) {
+		// defer wg.Done()
 
-			yi, _, err := computeyByRejectSampling(w, n, salt[i], ssidInfo)
-			if err != nil {
-				common.Logger.Errorf("%s", err.Error())
-				errChs <- err
-			}
-			// check z in [2, n-1]
-			zi := new(big.Int).SetBytes(z[i])
-			err = utils.InRange(zi, big2, n)
-			if err != nil {
-				common.Logger.Errorf("%s", err.Error())
-				errChs <- err
-			}
+		yi, _, err := computeyByRejectSampling(w, n, salt[i], ssidInfo)
+		if err != nil {
+			common.Logger.Errorf("%s", err.Error())
+			errChs <- err
+		}
+		// check z in [2, n-1]
+		zi := new(big.Int).SetBytes(z[i])
+		err = utils.InRange(zi, big2, n)
+		if err != nil {
+			common.Logger.Errorf("%s", err.Error())
+			errChs <- err
+		}
 
-			// check zi^n = yi mod n
-			if new(big.Int).Exp(zi, n, n).Cmp(yi) != 0 {
-				common.Logger.Errorf("%s", ErrVerifyFailure)
-				errChs <- ErrVerifyFailure
-			}
-			// xi^4 = (-1)^a*w^b*yi mod n
-			ai := new(big.Int).SetBytes(a[i])
-			err = utils.InRange(ai, big0, big2)
-			if err != nil {
-				common.Logger.Errorf("%s", err.Error())
-				errChs <- err
-			}
-			bi := new(big.Int).SetBytes(b[i])
-			err = utils.InRange(bi, big0, big2)
-			if err != nil {
-				common.Logger.Errorf("%s", err.Error())
-				errChs <- err
-			}
+		// check zi^n = yi mod n
+		if new(big.Int).Exp(zi, n, n).Cmp(yi) != 0 {
+			common.Logger.Errorf("%s", ErrVerifyFailure)
+			errChs <- ErrVerifyFailure
+		}
+		// xi^4 = (-1)^a*w^b*yi mod n
+		ai := new(big.Int).SetBytes(a[i])
+		err = utils.InRange(ai, big0, big2)
+		if err != nil {
+			common.Logger.Errorf("%s", err.Error())
+			errChs <- err
+		}
+		bi := new(big.Int).SetBytes(b[i])
+		err = utils.InRange(bi, big0, big2)
+		if err != nil {
+			common.Logger.Errorf("%s", err.Error())
+			errChs <- err
+		}
 
-			rightPary := new(big.Int).Set(yi)
-			if ai.Cmp(big1) == 0 {
-				rightPary.Neg(rightPary)
-			}
-			if bi.Cmp(big1) == 0 {
-				rightPary.Mul(rightPary, w)
-			}
-			rightPary.Mod(rightPary, n)
+		rightPary := new(big.Int).Set(yi)
+		if ai.Cmp(big1) == 0 {
+			rightPary.Neg(rightPary)
+		}
+		if bi.Cmp(big1) == 0 {
+			rightPary.Mul(rightPary, w)
+		}
+		rightPary.Mod(rightPary, n)
 
-			if new(big.Int).Exp(new(big.Int).SetBytes(x[i]), big4, n).Cmp(rightPary) != 0 {
-				common.Logger.Errorf("%s", ErrVerifyFailure)
-				errChs <- ErrVerifyFailure
-			}
-		}(i)
+		if new(big.Int).Exp(new(big.Int).SetBytes(x[i]), big4, n).Cmp(rightPary) != 0 {
+			common.Logger.Errorf("%s", ErrVerifyFailure)
+			errChs <- ErrVerifyFailure
+		}
+		// }(i)
 	}
 
 	// Consume error channels; wait for goroutines
-	wg.Wait()
+	// wg.Wait()
 	close(errChs)
 	for err := range errChs {
 		return err

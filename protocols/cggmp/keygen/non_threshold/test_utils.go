@@ -26,7 +26,7 @@ const (
 	Eddsa            = 1
 )
 const (
-	testFixtureDirFormat       = "%s/../../test/_keygen_fixtures/non_threshold"
+	testFixtureDirFormat       = "%s/../../test/_keygen_fixtures/threshold"
 	testEcdsaFixtureFileFormat = "ecdsa_keygen_data_%d.json"
 	testEddsaFixtureFileFormat = "eddsa_keygen_data_%d.json"
 )

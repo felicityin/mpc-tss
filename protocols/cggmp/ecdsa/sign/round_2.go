@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	sync "sync"
 
 	"github.com/felicityin/mpc-tss/common"
 	"github.com/felicityin/mpc-tss/crypto"
@@ -69,47 +68,47 @@ func (round *round2) Start() *tss.Error {
 	var psiHatProofs = make([]*affproof.PaillierAffAndGroupRangeMessage, len(round.Parties().IDs()))
 
 	errChs := make(chan *tss.Error, (len(round.Parties().IDs())-1)*2)
-	wg := sync.WaitGroup{}
-	wg.Add((len(round.Parties().IDs()) - 1) * 2)
+	// wg := sync.WaitGroup{}
+	// wg.Add((len(round.Parties().IDs()) - 1) * 2)
 
 	// Generates proofs for Pj
-	for j, Pj := range round.Parties().IDs() {
+	for j := range round.Parties().IDs() {
 		if j == i {
 			round.ok[j] = true
 			continue
 		}
 
-		go func(j int, Pj *tss.PartyID) {
-			defer wg.Done()
-			// aff-g proof: M(prove, Πaff-g, (sid, i), (Iε, Jε, Dj,i, Kj, Fj,i, Gi); (gammai, βi,j, si,j, ri,j))
-			negBeta, countDelta, r, s, D, F, psiProof, err := mta.MtaWithProofAff_g(
-				round.Rand(), contextI, round.aux.PedersenPKs[j], round.aux.PaillierPKs[i],
-				round.temp.kCiphertexts[j], round.temp.gamma, round.temp.Gamma,
-			)
-			Ds[j], Fs[j], psiProofs[j], round.temp.beta[j], _, _, _ = D, F, psiProof, negBeta, countDelta, r, s
-			if err != nil {
-				common.Logger.Errorf("create aff-g proof 1 failed: %s", err.Error())
-				errChs <- round.WrapError(fmt.Errorf("create aff-g proof 1 failed: %s", err.Error()))
-			}
-		}(j, Pj)
+		// go func(j int, Pj *tss.PartyID) {
+		// 	defer wg.Done()
+		// aff-g proof: M(prove, Πaff-g, (sid, i), (Iε, Jε, Dj,i, Kj, Fj,i, Gi); (gammai, βi,j, si,j, ri,j))
+		negBeta, countDelta, r, s, D, F, psiProof, err := mta.MtaWithProofAff_g(
+			round.Rand(), contextI, round.aux.PedersenPKs[j], round.aux.PaillierPKs[i],
+			round.temp.kCiphertexts[j], round.temp.gamma, round.temp.Gamma,
+		)
+		Ds[j], Fs[j], psiProofs[j], round.temp.beta[j], _, _, _ = D, F, psiProof, negBeta, countDelta, r, s
+		if err != nil {
+			common.Logger.Errorf("create aff-g proof 1 failed: %s", err.Error())
+			errChs <- round.WrapError(fmt.Errorf("create aff-g proof 1 failed: %s", err.Error()))
+		}
+		// }(j, Pj)
 
-		go func(j int, Pj *tss.PartyID) {
-			defer wg.Done()
-			// aff-g proof: M(prove, Πaff-g, (sid, i), (Iε, Jε, Dˆj,i, Kj, Fˆj,i, Xi); (xi, βˆi,j, sˆi,j, rˆi,j))
-			negBetaHat, countSigma, rhat, shat, Dhat, Fhat, psiHatProof, err := mta.MtaWithProofAff_g(
-				round.Rand(), contextI, round.aux.PedersenPKs[j], round.aux.PaillierPKs[i],
-				round.temp.kCiphertexts[j], round.key.PrivXi, round.key.PubXj[i],
-			)
-			Dhats[j], Fhats[j], psiHatProofs[j], round.temp.betaHat[j], _, _, _ = Dhat, Fhat, psiHatProof, negBetaHat, countSigma, rhat, shat
-			if err != nil {
-				common.Logger.Errorf("create aff-g proof 2 failed: %s", err.Error())
-				errChs <- round.WrapError(fmt.Errorf("create aff-g proof 2 failed: %s", err.Error()))
-			}
-		}(j, Pj)
+		// go func(j int, Pj *tss.PartyID) {
+		// 	defer wg.Done()
+		// aff-g proof: M(prove, Πaff-g, (sid, i), (Iε, Jε, Dˆj,i, Kj, Fˆj,i, Xi); (xi, βˆi,j, sˆi,j, rˆi,j))
+		negBetaHat, countSigma, rhat, shat, Dhat, Fhat, psiHatProof, err := mta.MtaWithProofAff_g(
+			round.Rand(), contextI, round.aux.PedersenPKs[j], round.aux.PaillierPKs[i],
+			round.temp.kCiphertexts[j], round.key.PrivXi, round.key.PubXj[i],
+		)
+		Dhats[j], Fhats[j], psiHatProofs[j], round.temp.betaHat[j], _, _, _ = Dhat, Fhat, psiHatProof, negBetaHat, countSigma, rhat, shat
+		if err != nil {
+			common.Logger.Errorf("create aff-g proof 2 failed: %s", err.Error())
+			errChs <- round.WrapError(fmt.Errorf("create aff-g proof 2 failed: %s", err.Error()))
+		}
+		// }(j, Pj)
 	}
 
 	// Consume error channels; wait for goroutines
-	wg.Wait()
+	// wg.Wait()
 	close(errChs)
 	culprits := make([]*tss.PartyID, 0, len(round.Parties().IDs()))
 	for err := range errChs {

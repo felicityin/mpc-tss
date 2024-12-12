@@ -7,7 +7,6 @@ package prmproof
 import (
 	"errors"
 	"math/big"
-	sync "sync"
 
 	"github.com/felicityin/mpc-tss/common"
 	"github.com/felicityin/mpc-tss/crypto/alice/utils"
@@ -40,36 +39,36 @@ func NewRingPederssenParameterMessage(ssidInfo []byte, eulerValue *big.Int, n *b
 	}
 
 	errChs := make(chan error, nubmerZkproof*2)
-	wg := sync.WaitGroup{}
-	wg.Add(nubmerZkproof)
+	// wg := sync.WaitGroup{}
+	// wg.Add(nubmerZkproof)
 
 	for i := 0; i < nubmerZkproof; i++ {
-		go func(i int) {
-			defer wg.Done()
-			// Sample ai in Z_{φ(N)} for i in {1,...,m}
-			ai, err := utils.RandomInt(eulerValue)
-			if err != nil {
-				common.Logger.Errorf("%s", err.Error())
-				errChs <- err
-			}
-			Ai := new(big.Int).Exp(t, ai, n)
-			// ei = {0, 1}
-			ei, err := utils.HashBytesToInt(salt, ssidInfo, n.Bytes(), s.Bytes(), t.Bytes(), Ai.Bytes())
-			if err != nil {
-				common.Logger.Errorf("%s", err.Error())
-				errChs <- err
-			}
-			ei.Mod(ei, big2)
-			// zi = ai+ei λ mod φ(N) for i in {1,...,m}
-			zi := new(big.Int).Add(ai, new(big.Int).Mul(ei, lambda))
-			zi.Mod(zi, eulerValue)
-			A[i] = Ai.Bytes()
-			Z[i] = zi.Bytes()
-		}(i)
+		// go func(i int) {
+		// 	defer wg.Done()
+		// Sample ai in Z_{φ(N)} for i in {1,...,m}
+		ai, err := utils.RandomInt(eulerValue)
+		if err != nil {
+			common.Logger.Errorf("%s", err.Error())
+			errChs <- err
+		}
+		Ai := new(big.Int).Exp(t, ai, n)
+		// ei = {0, 1}
+		ei, err := utils.HashBytesToInt(salt, ssidInfo, n.Bytes(), s.Bytes(), t.Bytes(), Ai.Bytes())
+		if err != nil {
+			common.Logger.Errorf("%s", err.Error())
+			errChs <- err
+		}
+		ei.Mod(ei, big2)
+		// zi = ai+ei λ mod φ(N) for i in {1,...,m}
+		zi := new(big.Int).Add(ai, new(big.Int).Mul(ei, lambda))
+		zi.Mod(zi, eulerValue)
+		A[i] = Ai.Bytes()
+		Z[i] = zi.Bytes()
+		// }(i)
 	}
 
 	// Consume error channels; wait for goroutines
-	wg.Wait()
+	// wg.Wait()
 	close(errChs)
 	for err := range errChs {
 		return nil, err
@@ -99,51 +98,51 @@ func (msg *RingPederssenParameterMessage) Verify(ssidInfo []byte) error {
 	Z := msg.Z
 
 	errChs := make(chan error, verifyTime*4)
-	wg := sync.WaitGroup{}
-	wg.Add(verifyTime)
+	// wg := sync.WaitGroup{}
+	// wg.Add(verifyTime)
 
 	for i := 0; i < verifyTime; i++ {
-		go func(i int) {
-			defer wg.Done()
+		// go func(i int) {
+		// 	defer wg.Done()
 
-			// check Ai \in Z_{n}^\ast and zi in [0,N).
-			Ai := new(big.Int).SetBytes(A[i])
-			err = utils.InRange(Ai, big0, n)
-			if err != nil {
-				common.Logger.Errorf("%s", err.Error())
-				errChs <- err
-			}
-			if !utils.IsRelativePrime(Ai, n) {
-				common.Logger.Errorf("%s", ErrVerifyFailure)
-				errChs <- ErrVerifyFailure
-			}
-			zi := new(big.Int).SetBytes(Z[i])
-			err = utils.InRange(zi, big0, n)
-			if err != nil {
-				common.Logger.Errorf("%s", err.Error())
-				errChs <- err
-			}
+		// check Ai \in Z_{n}^\ast and zi in [0,N).
+		Ai := new(big.Int).SetBytes(A[i])
+		err = utils.InRange(Ai, big0, n)
+		if err != nil {
+			common.Logger.Errorf("%s", err.Error())
+			errChs <- err
+		}
+		if !utils.IsRelativePrime(Ai, n) {
+			common.Logger.Errorf("%s", ErrVerifyFailure)
+			errChs <- ErrVerifyFailure
+		}
+		zi := new(big.Int).SetBytes(Z[i])
+		err = utils.InRange(zi, big0, n)
+		if err != nil {
+			common.Logger.Errorf("%s", err.Error())
+			errChs <- err
+		}
 
-			// Check t^{zi}=Ai· s^{ei} mod N , for every i ∈ {1,..,m}.
-			ei, err := utils.HashBytesToInt(msg.Salt, ssidInfo, n.Bytes(), s.Bytes(), t.Bytes(), A[i])
-			if err != nil {
-				common.Logger.Errorf("%s", err.Error())
-				errChs <- err
-			}
-			ei.Mod(ei, big2)
-			Asei := new(big.Int).Exp(s, ei, n)
-			Asei.Mul(Asei, Ai)
-			Asei.Mod(Asei, n)
-			tzi := new(big.Int).Exp(t, zi, n)
-			if tzi.Cmp(Asei) != 0 {
-				common.Logger.Errorf("%s", ErrVerifyFailure)
-				errChs <- ErrVerifyFailure
-			}
-		}(i)
+		// Check t^{zi}=Ai· s^{ei} mod N , for every i ∈ {1,..,m}.
+		ei, err := utils.HashBytesToInt(msg.Salt, ssidInfo, n.Bytes(), s.Bytes(), t.Bytes(), A[i])
+		if err != nil {
+			common.Logger.Errorf("%s", err.Error())
+			errChs <- err
+		}
+		ei.Mod(ei, big2)
+		Asei := new(big.Int).Exp(s, ei, n)
+		Asei.Mul(Asei, Ai)
+		Asei.Mod(Asei, n)
+		tzi := new(big.Int).Exp(t, zi, n)
+		if tzi.Cmp(Asei) != 0 {
+			common.Logger.Errorf("%s", ErrVerifyFailure)
+			errChs <- ErrVerifyFailure
+		}
+		// }(i)
 	}
 
 	// Consume error channels; wait for goroutines
-	wg.Wait()
+	// wg.Wait()
 	close(errChs)
 	for err := range errChs {
 		return err
