@@ -1,9 +1,3 @@
-// Copyright © 2019 Binance
-//
-// This file is part of Binance. The full Binance copyright notice, including
-// terms governing use, modification, and redistribution, is contained in the
-// file LICENSE at the root of the source code distribution tree.
-
 package auxiliary
 
 import (
@@ -18,7 +12,7 @@ import (
 var big1 = big.NewInt(1)
 
 func GeneratePaillier(rand io.Reader) (*paillier.PrivateKey, error) {
-	pl := pool.NewPool(1)
+	pl := pool.NewPool(0)
 	P, Q := sample.Paillier(rand, pl)
 	N := new(big.Int).Mul(P, Q)
 
