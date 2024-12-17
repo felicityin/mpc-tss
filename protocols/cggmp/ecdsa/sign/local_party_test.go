@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
-	"runtime"
 	"sync/atomic"
 	"testing"
 
@@ -20,6 +19,7 @@ import (
 	nonKeygen "github.com/felicityin/mpc-tss/protocols/cggmp/keygen/non_threshold"
 	tKeygen "github.com/felicityin/mpc-tss/protocols/cggmp/keygen/threshold"
 	"github.com/felicityin/mpc-tss/protocols/cggmp/test"
+	"github.com/felicityin/mpc-tss/protocols/utils"
 	"github.com/felicityin/mpc-tss/tss"
 )
 
@@ -242,21 +242,5 @@ SIGN:
 		}
 	}
 
-	readMem()
-}
-
-func readMem() {
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-
-	// fmt.Println(ms) // 太复杂了
-
-	// 内存 通义千问
-	// 打印一些关键的内存统计信息
-	fmt.Printf("Alloc = %v MiB\n", m.Alloc/1024/1024)           // 分配但未释放的内存
-	fmt.Printf("TotalAlloc = %v MiB\n", m.TotalAlloc/1024/1024) // 程序启动以来分配的总内存
-	fmt.Printf("Sys = %v MiB\n", m.Sys/1024/1024)               // 从操作系统分配的总内存
-	fmt.Printf("HeapAlloc = %v MiB\n", m.HeapAlloc/1024/1024)   // 从堆上分配但未释放的内存
-	fmt.Printf("HeapSys = %v MiB\n", m.HeapSys/1024/1024)       // 由Go分配的堆内存的系统内存大小
-	fmt.Printf("NumGC = %v\n", m.NumGC)                         // 进行的GC次数
+	utils.ReadMem()
 }
