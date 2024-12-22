@@ -16,18 +16,18 @@
 package paillier
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
 	gmath "math"
 	"math/big"
-	"runtime"
 	"strconv"
 
 	"github.com/otiai10/primes"
 
 	"github.com/felicityin/mpc-tss/common"
+	"github.com/felicityin/mpc-tss/common/pool"
+	"github.com/felicityin/mpc-tss/common/sample"
 	crypto2 "github.com/felicityin/mpc-tss/crypto"
 	pailliera "github.com/felicityin/mpc-tss/crypto/alice/paillier"
 	"github.com/felicityin/mpc-tss/crypto/alice/utils"
@@ -71,47 +71,19 @@ func init() {
 	_ = primes.Globally.Until(verifyPrimesUntil)
 }
 
-// len is the length of the modulus (each prime = len / 2)
-func GenerateKeyPair(ctx context.Context, rand io.Reader, modulusBitLen int, optionalConcurrency ...int) (privateKey *PrivateKey, publicKey *PublicKey, err error) {
-	var concurrency int
-	if 0 < len(optionalConcurrency) {
-		if 1 < len(optionalConcurrency) {
-			panic(errors.New("GeneratePreParams: expected 0 or 1 item in `optionalConcurrency`"))
-		}
-		concurrency = optionalConcurrency[0]
-	} else {
-		concurrency = runtime.NumCPU()
-	}
-
-	// KS-BTL-F-03: use two safe primes for P, Q
-	var P, Q, N *big.Int
-	{
-		tmp := new(big.Int)
-		for {
-			sgps, err := common.GetRandomSafePrimesConcurrent(ctx, modulusBitLen/2, 2, concurrency, rand)
-			if err != nil {
-				return nil, nil, err
-			}
-			P, Q = sgps[0].SafePrime(), sgps[1].SafePrime()
-			// KS-BTL-F-03: check that p-q is also very large in order to avoid square-root attacks
-			if tmp.Sub(P, Q).BitLen() >= (modulusBitLen/2)-pQBitLenDifference {
-				break
-			}
-		}
-		N = tmp.Mul(P, Q)
-	}
-
+func GeneratePaillier(rand io.Reader) (*PrivateKey, *PublicKey, error) {
+	pl := pool.NewPool(0)
+	P, Q := sample.Paillier(rand, pl)
+	N := new(big.Int).Mul(P, Q)
 	// phiN = P-1 * Q-1
 	PMinus1, QMinus1 := new(big.Int).Sub(P, one), new(big.Int).Sub(Q, one)
 	phiN := new(big.Int).Mul(PMinus1, QMinus1)
-
 	// lambdaN = lcm(P−1, Q−1)
 	gcd := new(big.Int).GCD(nil, nil, PMinus1, QMinus1)
 	lambdaN := new(big.Int).Div(phiN, gcd)
-
-	publicKey = &PublicKey{N: N}
-	privateKey = &PrivateKey{PublicKey: *publicKey, LambdaN: lambdaN, PhiN: phiN, P: P, Q: Q}
-	return
+	publicKey := &PublicKey{N: N}
+	privateKey := &PrivateKey{PublicKey: *publicKey, LambdaN: lambdaN, PhiN: phiN, P: P, Q: Q}
+	return privateKey, publicKey, nil
 }
 
 // ----- //

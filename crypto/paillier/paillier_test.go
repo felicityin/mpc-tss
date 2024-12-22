@@ -7,11 +7,9 @@
 package paillier_test
 
 import (
-	"context"
 	"crypto/rand"
 	"math/big"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -19,11 +17,6 @@ import (
 	"github.com/felicityin/mpc-tss/crypto"
 	. "github.com/felicityin/mpc-tss/crypto/paillier"
 	"github.com/felicityin/mpc-tss/tss"
-)
-
-// Using a modulus length of 2048 is recommended in the GG18 spec
-const (
-	testPaillierKeyLength = 2048
 )
 
 var (
@@ -36,11 +29,8 @@ func setUp(t *testing.T) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer cancel()
-
 	var err error
-	privateKey, publicKey, err = GenerateKeyPair(ctx, rand.Reader, testPaillierKeyLength)
+	privateKey, publicKey, err = GeneratePaillier(rand.Reader)
 	assert.NoError(t, err)
 }
 
@@ -141,17 +131,4 @@ func TestComputeL(t *testing.T) {
 	actual := L(u, n)
 
 	assert.Equal(t, 0, expected.Cmp(actual))
-}
-
-func TestGenerateXs(t *testing.T) {
-	k := common.MustGetRandomInt(rand.Reader, 256)
-	sX := common.MustGetRandomInt(rand.Reader, 256)
-	sY := common.MustGetRandomInt(rand.Reader, 256)
-	N := common.GetRandomPrimeInt(rand.Reader, 2048)
-
-	xs := GenerateXs(13, k, N, crypto.NewECPointNoCurveCheck(tss.EC(), sX, sY))
-	assert.Equal(t, 13, len(xs))
-	for _, xi := range xs {
-		assert.True(t, common.IsNumberInMultiplicativeGroup(N, xi))
-	}
 }

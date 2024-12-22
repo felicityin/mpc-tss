@@ -50,24 +50,6 @@ func GetRandomPositiveInt(rand io.Reader, lessThan *big.Int) *big.Int {
 	return try
 }
 
-func GetRandomPrimeInt(rand io.Reader, bits int) *big.Int {
-	if bits <= 0 {
-		return nil
-	}
-	try, err := cryptorand.Prime(rand, bits)
-	if err != nil ||
-		try.Cmp(zero) == 0 {
-		// fallback to older method
-		for {
-			try = MustGetRandomInt(rand, bits)
-			if probablyPrime(try) {
-				break
-			}
-		}
-	}
-	return try
-}
-
 // Generate a random element in the group of all the elements in Z/nZ that
 // has a multiplicative inverse.
 func GetRandomPositiveRelativelyPrimeInt(rand io.Reader, n *big.Int) *big.Int {
