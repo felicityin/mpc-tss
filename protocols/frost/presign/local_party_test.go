@@ -33,7 +33,7 @@ func setUp(level string) {
 	tss.SetCurve(tss.Edwards())
 }
 
-func TestE2EConcurrent(t *testing.T) {
+func TestE2ENonThresholdConcurrent(t *testing.T) {
 	setUp("debug")
 
 	threshold := testParticipants
@@ -108,7 +108,7 @@ SIGN:
 	}
 }
 
-func TestE2EConcurrent1(t *testing.T) {
+func TestE2EThresholdConcurrent(t *testing.T) {
 	setUp("debug")
 
 	threshold := testParticipants

@@ -25,3 +25,57 @@ For [FROST](https://eprint.iacr.org/2020/852.pdf), this repo implements:
 
 - (1+1)-round general threshold and non-threshold signing
 - HD-wallets support based on slip10 standard (compatible with bip32)
+
+# Examples
+
+## CGGMP21
+
+### ECDSA
+
+##### Non-Threshold
+
+- [keygen](https://github.com/felicityin/mpc-tss/blob/main/protocols/cggmp/keygen/non_threshold/local_party_test.go#L35)
+- [auxiliary](https://github.com/felicityin/mpc-tss/blob/main/protocols/cggmp/auxiliary/local_party_test.go)
+- [sign](https://github.com/felicityin/mpc-tss/blob/main/protocols/cggmp/ecdsa/sign/local_party_test.go#L39)
+- [pre-signing](https://github.com/felicityin/mpc-tss/blob/main/protocols/cggmp/ecdsa/presign/local_party_test.go#L37)
+- [signing](https://github.com/felicityin/mpc-tss/blob/main/protocols/cggmp/ecdsa/signing/local_party_test.go#L39)
+
+##### Threshold
+
+- [keygen](https://github.com/felicityin/mpc-tss/blob/main/protocols/cggmp/keygen/threshold/local_party_test.go#L39)
+- [auxiliary](https://github.com/felicityin/mpc-tss/blob/main/protocols/cggmp/auxiliary/local_party_test.go)
+- [sign](https://github.com/felicityin/mpc-tss/blob/main/protocols/cggmp/ecdsa/sign/local_party_test.go#L143)
+- [pre-signing](https://github.com/felicityin/mpc-tss/blob/main/protocols/cggmp/ecdsa/presign/local_party_test.go#L121)
+- [signing](https://github.com/felicityin/mpc-tss/blob/main/protocols/cggmp/ecdsa/signing/local_party_test.go#L143)
+
+### EdDSA
+
+##### Non-Threshold
+
+- [keygen](https://github.com/felicityin/mpc-tss/blob/main/protocols/cggmp/keygen/non_threshold/local_party_test.go#L39)
+- [sign](https://github.com/felicityin/mpc-tss/blob/main/protocols/cggmp/eddsa/sign/local_party_test.go#L40)
+- [pre-signing](https://github.com/felicityin/mpc-tss/blob/main/protocols/cggmp/eddsa/presign/local_party_test.go#L37)
+- [signing](https://github.com/felicityin/mpc-tss/blob/main/protocols/cggmp/eddsa/signing/local_party_test.go#L38)
+
+##### Threshold
+
+- [keygen](https://github.com/felicityin/mpc-tss/blob/main/protocols/cggmp/keygen/threshold/local_party_test.go#L43)
+- [sign](https://github.com/felicityin/mpc-tss/blob/main/protocols/cggmp/eddsa/sign/local_party_test.go#L155)
+- [pre-signing](https://github.com/felicityin/mpc-tss/blob/main/protocols/cggmp/eddsa/presign/local_party_test.go#L120)
+- [signing](https://github.com/felicityin/mpc-tss/blob/main/protocols/cggmp/eddsa/signing/local_party_test.go#L153)
+
+## FROST
+
+##### Non-Threshold
+
+- [keygen](https://github.com/felicityin/mpc-tss/blob/main/protocols/cggmp/keygen/non_threshold/local_party_test.go#L39)
+- [sign](https://github.com/felicityin/mpc-tss/blob/main/protocols/frost/sign/local_party_test.go#L39)
+- [pre-signing](https://github.com/felicityin/mpc-tss/blob/main/protocols/frost/presign/local_party_test.go#L36)
+- [signing](https://github.com/felicityin/mpc-tss/blob/main/protocols/frost/signing/local_party_test.go#L40)
+
+##### Threshold
+
+- [keygen](https://github.com/felicityin/mpc-tss/blob/main/protocols/cggmp/keygen/threshold/local_party_test.go#L43)
+- [sign](https://github.com/felicityin/mpc-tss/blob/main/protocols/frost/sign/local_party_test.go#L150)
+- [pre-signing](https://github.com/felicityin/mpc-tss/blob/main/protocols/frost/presign/local_party_test.go#L111)
+- [signing](https://github.com/felicityin/mpc-tss/blob/main/protocols/frost/signing/local_party_test.go#L155)
