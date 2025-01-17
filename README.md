@@ -66,6 +66,8 @@ For [FROST](https://eprint.iacr.org/2020/852.pdf), this repo implements:
 
 ## FROST
 
+### EdDSA
+
 ##### Non-Threshold
 
 - [keygen](https://github.com/felicityin/mpc-tss/blob/main/protocols/cggmp/keygen/non_threshold/local_party_test.go#L39)
